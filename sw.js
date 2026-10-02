@@ -1,10 +1,10 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — SERVICE WORKER
    PWA / offline básico.
-   v8: añade fuente de marca OPTIColumna Solid.
+   v15: actualización de assets y mejoras en el manejo de caché.
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v8";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v15";
 
 const CORE_ASSETS = [
   "./",
