@@ -2,7 +2,7 @@
   "name": "Grimoire: Lost Pages",
   "short_name": "Grimoire",
   "description": "Deckbuilder oscuro donde cada carta es una página perdida de un grimorio viviente.",
-  "id": "/",
+  "id": "/grimoire-lost-pages/",
   "start_url": "/grimoire-lost-pages/",
   "scope": "/grimoire-lost-pages/",
   "display": "standalone",
