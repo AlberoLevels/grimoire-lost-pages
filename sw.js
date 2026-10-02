@@ -1,11 +1,11 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — SERVICE WORKER
-   PWA / offline básico.
-   Versión v2 para forzar reinstall limpia en Android.
+   Versión v4 - Rutas relativas seguras para GitHub Pages
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v2";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v4";
 
+// Lista de assets críticos. Todas rutas relativas desde la raíz del SW.
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -24,6 +24,10 @@ self.addEventListener("install", (event) => {
       .open(CACHE_NAME)
       .then((cache) => cache.addAll(CORE_ASSETS))
       .then(() => self.skipWaiting())
+      .catch((err) => {
+        console.error("SW Install failed:", err);
+        // Si falla el install, no bloqueamos, pero avisamos por consola
+      })
   );
 });
 
@@ -51,7 +55,14 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(request.url);
 
-  // Navegaciones: red primero, fallback a index.html en caché.
+  // Ignorar peticiones a otros dominios
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
+  // Estrategia: Cache First para assets estáticos
+  // Network First para navegación (para capturar cambios rápidos)
+  
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -62,41 +73,13 @@ self.addEventListener("fetch", (event) => {
               cache.put("./index.html", copy);
             });
           }
-
           return response;
         })
         .catch(() => caches.match("./index.html"))
     );
-
     return;
   }
 
-  // Solo mismos dominio.
-  if (requestUrl.origin !== self.location.origin) {
-    return;
-  }
-
-  // Si alguien pide index.html con query, también fallback a caché básica.
-  if (requestUrl.pathname.endsWith("/index.html")) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put("./index.html", copy);
-            });
-          }
-
-          return response;
-        })
-        .catch(() => caches.match("./index.html"))
-    );
-
-    return;
-  }
-
-  // Assets: caché primero, luego red, y se actualiza en segundo plano.
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const networkFetch = fetch(request)
@@ -107,7 +90,6 @@ self.addEventListener("fetch", (event) => {
               cache.put(request, copy);
             });
           }
-
           return networkResponse;
         })
         .catch(() => cachedResponse);
