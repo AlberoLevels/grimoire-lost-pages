@@ -2,9 +2,9 @@
   "name": "Grimoire: Lost Pages",
   "short_name": "Grimoire",
   "description": "Deckbuilder oscuro donde cada carta es una página perdida de un grimorio viviente.",
-  "id": "/grimoire-lost-pages/",
-  "start_url": "/grimoire-lost-pages/",
-  "scope": "/grimoire-lost-pages/",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#05070f",
   "theme_color": "#0f172a",
@@ -14,16 +14,22 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/grimoire-lost-pages/icons/icon-192.png",
+      "src": "./icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/grimoire-lost-pages/icons/icon-512.png",
+      "src": "./icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
