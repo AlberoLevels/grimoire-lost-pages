@@ -1,11 +1,12 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES
-   style.css completo — Fase 1
+   style.css completo — Fase 1 + tipografía de marca
    Móvil vertical + PC horizontal
    Incluye:
    - efecto ambiental "mirada arcana"
    - contadores de Grimorio y Cenizas
    - overlay para ver páginas restantes / descartadas
+   - fuente de marca OPTIColumna Solid
    ========================================================================== */
 
 :root {
@@ -25,6 +26,7 @@
   --ink-glow: rgba(96, 165, 250, 0.35);
 
   --purple: #a855f7;
+  --purple-light: #c084fc;
   --purple-deep: #4c1d95;
   --purple-glow: rgba(168, 85, 247, 0.28);
 
@@ -46,7 +48,7 @@
   --text-dim: rgba(248, 250, 252, 0.78);
   --text-faint: rgba(248, 250, 252, 0.52);
 
-  --font-title: Georgia, "Times New Roman", serif;
+  --font-title: "OPTIColumna Solid", Georgia, "Times New Roman", serif;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-strong: "Arial Black", "Segoe UI", Impact, sans-serif;
 
@@ -67,6 +69,14 @@
   --look-y: 0px;
   --rune-x: 0px;
   --rune-y: 0px;
+}
+
+@font-face {
+  font-family: "OPTIColumna Solid";
+  src: url("./fonts/opticolumna-solid.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @supports (top: env(safe-area-inset-top)) {
@@ -103,6 +113,24 @@ body {
   font-family: var(--font-ui);
   touch-action: manipulation;
   user-select: none;
+}
+
+/* La fuente de marca solo tiene peso Solid.
+   Evitamos bold/italic sintéticos para que no deforme el logotipo. */
+h1,
+h2,
+h3,
+.panel-label,
+.enemy-name,
+.page-name,
+.deck-item-name,
+.battle-message,
+.intro-text,
+.deck-subtitle,
+.deck-empty,
+.overlay-card h1,
+.overlay-card h2 {
+  font-weight: 400;
 }
 
 /* ==========================================================================
@@ -556,7 +584,7 @@ body {
   margin: 0;
   font-family: var(--font-title);
   font-size: clamp(0.72rem, 2vw, 0.98rem);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.05;
   color: #fff7e6;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
@@ -899,7 +927,7 @@ body {
 
 .intro-text {
   font-family: var(--font-title);
-  font-style: italic;
+  font-style: normal;
   color: rgba(232, 220, 196, 0.82);
 }
 
@@ -965,7 +993,7 @@ body {
 .deck-subtitle {
   margin: 0 0 0.75rem;
   font-family: var(--font-title);
-  font-style: italic;
+  font-style: normal;
   font-size: clamp(0.72rem, 2vw, 0.88rem);
   line-height: 1.25;
   color: var(--text-dim);
@@ -1024,7 +1052,7 @@ body {
   margin: 0;
   font-family: var(--font-title);
   font-size: clamp(0.76rem, 2.2vw, 0.95rem);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.1;
   color: #fff7e6;
   overflow-wrap: break-word;
@@ -1055,7 +1083,7 @@ body {
   padding: 1rem 0.25rem;
   text-align: center;
   font-family: var(--font-title);
-  font-style: italic;
+  font-style: normal;
   color: var(--text-dim);
   font-size: clamp(0.78rem, 2.3vw, 0.95rem);
   line-height: 1.35;
