@@ -1,10 +1,10 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — SERVICE WORKER
    PWA / offline básico.
-   v7: añade icono maskable PNG.
+   v8: añade fuente de marca OPTIColumna Solid.
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v7";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v8";
 
 const CORE_ASSETS = [
   "./",
@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   "./game.js",
   "./src/logic.js",
   "./manifest.webmanifest",
+  "./fonts/opticolumna-solid.woff2",
   "./icons/favicon.ico",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
