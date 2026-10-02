@@ -1,11 +1,11 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — SERVICE WORKER
-   Versión v4 - Rutas relativas seguras para GitHub Pages
+   PWA / offline básico.
+   v7: añade icono maskable PNG.
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v5";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v7";
 
-// Lista de assets críticos. Todas rutas relativas desde la raíz del SW.
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -15,7 +15,8 @@ const CORE_ASSETS = [
   "./manifest.webmanifest",
   "./icons/favicon.ico",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -24,9 +25,9 @@ self.addEventListener("install", (event) => {
       .open(CACHE_NAME)
       .then((cache) => cache.addAll(CORE_ASSETS))
       .then(() => self.skipWaiting())
-      .catch((err) => {
-        console.error("SW Install failed:", err);
-        // Si falla el install, no bloqueamos, pero avisamos por consola
+      .catch((error) => {
+        console.error("Service Worker install error:", error);
+        throw error;
       })
   );
 });
@@ -55,14 +56,7 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(request.url);
 
-  // Ignorar peticiones a otros dominios
-  if (requestUrl.origin !== self.location.origin) {
-    return;
-  }
-
-  // Estrategia: Cache First para assets estáticos
-  // Network First para navegación (para capturar cambios rápidos)
-  
+  // Navegaciones: red primero, fallback a index.html en caché.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -73,13 +67,21 @@ self.addEventListener("fetch", (event) => {
               cache.put("./index.html", copy);
             });
           }
+
           return response;
         })
         .catch(() => caches.match("./index.html"))
     );
+
     return;
   }
 
+  // Solo gestionar peticiones del mismo origen.
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
+  // Assets: caché primero, luego red, y se actualiza en segundo plano.
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const networkFetch = fetch(request)
@@ -90,6 +92,7 @@ self.addEventListener("fetch", (event) => {
               cache.put(request, copy);
             });
           }
+
           return networkResponse;
         })
         .catch(() => cachedResponse);
