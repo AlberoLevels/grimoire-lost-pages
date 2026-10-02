@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="color-scheme" content="dark">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Grimoire">
+    <meta name="description" content="Grimoire: Lost Pages. Deckbuilder oscuro donde cada carta es una página perdida de un grimorio viviente.">
+
+    <title>Grimoire: Lost Pages</title>
+
+    <link rel="stylesheet" href="./style.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="./icons/favicon.ico">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.webmanifest">
+
+    <!-- Icono para añadir a pantalla de inicio en algunos navegadores -->
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+</head>
+<body>
+
+    <!-- Capa reservada para efectos futuros tipo Phaser/WebGL -->
+    <div id="fx-layer" class="fx-layer" aria-hidden="true"></div>
+
+    <!-- Interfaz principal del juego -->
+    <main id="game" class="game-root">
+
+        <!-- HUD superior -->
+        <header id="hud" class="hud">
+
+            <!-- Panel del jugador -->
+            <section id="player-panel" class="hud-panel player-panel" aria-label="Estado del jugador">
+                <h2 class="panel-label">Vitalidad</h2>
+                <p id="player-hp" class="stat-value">--/--</p>
+                <div id="player-effects" class="effects-list" aria-label="Efectos del jugador"></div>
+            </section>
+
+            <!-- Panel de recurso principal -->
+            <section id="ink-panel" class="hud-panel ink-panel" aria-label="Tinta Arcana">
+                <h2 class="panel-label">Tinta Arcana</h2>
+                <p id="ink-value" class="stat-value stat-value-large">--/--</p>
+            </section>
+
+            <!-- Panel del enemigo -->
+            <section id="enemy-panel" class="hud-panel enemy-panel" aria-label="Estado del enemigo">
+                <h2 id="enemy-name" class="enemy-name">Amenaza</h2>
+                <p id="enemy-hp" class="stat-value">--</p>
+                <div id="enemy-intent" class="enemy-intent" aria-label="Intención del enemigo"></div>
+            </section>
+
+        </header>
+
+        <!-- Zona central de combate/ritual -->
+        <section id="battlefield" class="battlefield" aria-label="Campo de ritual">
+
+            <!-- Avatar simbólico del enemigo. Más adelante puede sustituirse por arte o efecto. -->
+            <div id="enemy-avatar" class="enemy-avatar" aria-hidden="true">
+                ✦
+            </div>
+
+            <!-- Mensaje principal del combate -->
+            <p id="battle-message" class="battle-message">
+                El grimorio espera...
+            </p>
+
+            <!-- Capa para textos flotantes: daño, curación, bloqueo, quemadura, etc. -->
+            <div id="floating-text-layer" class="floating-text-layer" aria-hidden="true"></div>
+
+        </section>
+
+        <!-- Zona inferior: mano de páginas, estado del grimorio y botón principal -->
+        <footer id="hand-area" class="hand-area">
+
+            <!-- Mano de cartas/páginas -->
+            <div id="hand" class="hand" role="list" aria-label="Páginas abiertas">
+                <!-- Las páginas se generarán desde game.js -->
+            </div>
+
+            <!-- Columna derecha: contadores + botón -->
+            <div class="action-column">
+
+                <!-- Estado del grimorio / cenizas -->
+                <div id="deck-status" class="deck-status" aria-label="Estado del grimorio">
+                    <button id="open-grimoire" class="deck-counter" type="button" aria-label="Ver páginas restantes en el grimorio">
+                        <span class="deck-counter-label">Grimorio</span>
+                        <span id="grimoire-count" class="deck-counter-value">--</span>
+                    </button>
+
+                    <button id="open-ashes" class="deck-counter" type="button" aria-label="Ver cenizas del grimorio">
+                        <span class="deck-counter-label">Cenizas</span>
+                        <span id="ashes-count" class="deck-counter-value">--</span>
+                    </button>
+                </div>
+
+                <!-- Botón principal de fin de turno -->
+                <button id="end-turn" class="ritual-button" type="button">
+                    Cerrar Ritual
+                </button>
+
+            </div>
+
+        </footer>
+
+    </main>
+
+    <!-- =========================================================
+         BLOQUE DEL AVISO DE GIRAR EL TELÉFONO
+         Está incluido, pero con el style.css actual queda oculto.
+         ========================================================= -->
+    <div id="orientation-warning" class="overlay orientation-warning" role="alertdialog" aria-live="assertive">
+        <div class="overlay-card orientation-card">
+            <h2>Gira el dispositivo</h2>
+            <p>
+                Grimoire: Lost Pages se juega mejor en horizontal.
+            </p>
+            <div class="rotate-icon" aria-hidden="true">↻</div>
+        </div>
+    </div>
+    <!-- ========================================================= -->
+
+    <!-- Overlay: intro narrativa -->
+    <div id="intro-screen" class="overlay intro-screen" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+        <div class="overlay-card intro-card">
+            <h1 id="intro-title">Grimoire: Lost Pages</h1>
+            <p class="intro-text">
+                El grimorio fue rasgado en mil páginas perdidas.
+                Cada carta es un hechizo olvidado.
+                Cada partida, una tentativa de reescribir el destino...
+                o ser reescrito por él.
+            </p>
+            <button id="start-game" class="ritual-button secondary-button" type="button">
+                Abrir el Grimorio
+            </button>
+        </div>
+    </div>
+
+    <!-- Overlay: victoria / derrota -->
+    <div id="result-screen" class="overlay result-screen" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+        <div class="overlay-card result-card">
+            <h2 id="result-title">Victoria</h2>
+            <p id="result-text">Has recuperado una página perdida.</p>
+            <button id="restart-game" class="ritual-button secondary-button" type="button">
+                Reabrir el Grimorio
+            </button>
+        </div>
+    </div>
+
+    <!-- Overlay: inspección de página -->
+    <div id="inspect-overlay" class="overlay inspect-overlay" role="dialog" aria-modal="true" aria-label="Inspección de página" hidden>
+        <button id="close-inspect" class="icon-button" type="button" aria-label="Cerrar inspección">
+            ×
+        </button>
+        <article id="inspect-card" class="page-card page-card-large">
+            <!-- Contenido generado desde game.js -->
+        </article>
+    </div>
+
+    <!-- Overlay: lista de Grimorio / Cenizas -->
+    <div id="deck-overlay" class="overlay deck-overlay" role="dialog" aria-modal="true" aria-labelledby="deck-overlay-title" hidden>
+        <button id="close-deck" class="icon-button" type="button" aria-label="Cerrar lista de páginas">
+            ×
+        </button>
+
+        <div class="overlay-card deck-card">
+            <h2 id="deck-overlay-title">Grimorio</h2>
+            <p id="deck-overlay-subtitle" class="deck-subtitle">Páginas restantes</p>
+
+            <div id="deck-list" class="deck-list" role="list" aria-label="Lista de páginas">
+                <!-- Contenido generado desde game.js -->
+            </div>
+
+            <button id="deck-close-bottom" class="ritual-button secondary-button" type="button">
+                Cerrar
+            </button>
+        </div>
+    </div>
+
+    <!-- Lógica del juego. No se modifica en Fase 1. -->
+    <script src="./src/logic.js"></script>
+
+    <!-- Controlador de interfaz HTML/CSS. -->
+    <script src="./game.js"></script>
+
+    <!-- Registro del Service Worker para PWA / offline -->
+    <script>
+        if ("serviceWorker" in navigator && window.isSecureContext) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker
+                    .register("./sw.js")
+                    .then((registration) => {
+                        console.log("Service Worker registrado:", registration.scope);
+                    })
+                    .catch((error) => {
+                        console.warn("No se pudo registrar el Service Worker:", error);
+                    });
+            });
+        }
+    </script>
+
+</body>
+</html>
