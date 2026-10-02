@@ -1,9 +1,10 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — SERVICE WORKER
    PWA / offline básico.
+   Versión v2 para forzar reinstall limpia en Android.
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v1";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v2";
 
 const CORE_ASSETS = [
   "./",
@@ -50,24 +51,48 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(request.url);
 
-  // Navegaciones: red primero, fallback a caché.
+  // Navegaciones: red primero, fallback a index.html en caché.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put("./index.html", copy);
-          });
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put("./index.html", copy);
+            });
+          }
+
           return response;
         })
         .catch(() => caches.match("./index.html"))
     );
+
     return;
   }
 
   // Solo mismos dominio.
   if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
+  // Si alguien pide index.html con query, también fallback a caché básica.
+  if (requestUrl.pathname.endsWith("/index.html")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put("./index.html", copy);
+            });
+          }
+
+          return response;
+        })
+        .catch(() => caches.match("./index.html"))
+    );
+
     return;
   }
 
@@ -82,6 +107,7 @@ self.addEventListener("fetch", (event) => {
               cache.put(request, copy);
             });
           }
+
           return networkResponse;
         })
         .catch(() => cachedResponse);
