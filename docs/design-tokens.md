@@ -26,7 +26,7 @@ El juego no debe parecer una app genérica. Debe parecer un ritual interactivo.
 ### Fondos
 
 | Token | Valor | Uso |
-|---|---:|---|
+|---|---|---|
 | --bg-deep | #05070f | Fondo más profundo, base del mundo |
 | --bg-night | #0f172a | Fondo principal de pantalla |
 | --bg-panel | rgba(15, 23, 42, 0.86) | Paneles HUD |
@@ -35,14 +35,14 @@ El juego no debe parecer una app genérica. Debe parecer un ritual interactivo.
 ### Papel / pergamino arcana
 
 | Token | Valor | Uso |
-|---|---:|---|
+|---|---|---|
 | --parchment | #e8dcc4 | Texto cálido, etiquetas de página |
 | --parchment-dim | rgba(232, 220, 196, 0.72) | Texto secundario cálido |
 
 ### Dorado ritual
 
 | Token | Valor | Uso |
-|---|---:|---|
+|---|---|---|
 | --gold | #fbbf24 | Bordes, costes, acentos de marca |
 | --gold-soft | rgba(251, 191, 36, 0.82) | Etiquetas y títulos suaves |
 | --gold-border | rgba(251, 191, 36, 0.34) | Bordes de panel |
@@ -50,14 +50,14 @@ El juego no debe parecer una app genérica. Debe parecer un ritual interactivo.
 ### Tinta arcana
 
 | Token | Valor | Uso |
-|---|---:|---|
+|---|---|---|
 | --ink | #60a5fa | Tinta Arcana, energía, brillos fríos |
 | --ink-glow | rgba(96, 165, 250, 0.35) | Glow de tinta |
 
 ### Violeta de grimorio
 
 | Token | Valor | Uso |
-|---|---:|---|
+|---|---|---|
 | --purple | #a855f7 | Poder, avatar enemigo, motivo estelar |
 | --purple-light | #c084fc | Puntas brillantes del destello |
 | --purple-deep | #4c1d95 | Fondos profundos de cartas de poder |
@@ -66,7 +66,7 @@ El juego no debe parecer una app genérica. Debe parecer un ritual interactivo.
 ### Combate
 
 | Token | Valor | Uso |
-|---|---:|---|
+|---|---|---|
 | --blood | #ef4444 | Vida, daño, ataque |
 | --blood-deep | #7f1d1d | Fondo de cartas de ataque |
 | --blood-glow | rgba(239, 68, 68, 0.25) | Glow de daño |
@@ -81,7 +81,7 @@ El juego no debe parecer una app genérica. Debe parecer un ritual interactivo.
 ### Texto
 
 | Token | Valor | Uso |
-|---|---:|---|
+|---|---|---|
 | --text | #f8fafc | Texto principal |
 | --text-dim | rgba(248, 250, 252, 0.78) | Texto secundario |
 | --text-faint | rgba(248, 250, 252, 0.52) | Texto terciario |
@@ -393,3 +393,52 @@ Si la respuesta es no, se ajusta.
 
 El juego no debe parecer una plantilla de deckbuilder genérica.  
 Debe parecer un libro maldito que el jugador está intentando reescribir.
+
+---
+
+## 15. Scrollbars coherentes
+
+Las barras de scroll internas (listados de Grimorio/Cenizas, overlays largos) NO deben usar el estilo nativo gris del navegador. Deben integrarse gráficamente con el resto del juego.
+
+Estilo obligatorio:
+
+- Track: oscuro semitransparente (rgba(2, 6, 23, 0.4)), redondeado.
+- Thumb: degradado vertical dorado → violeta (linear-gradient(180deg, var(--gold-soft), rgba(168, 85, 247, 0.6))), redondeado, con shadow interna sutil.
+- Hover thumb: intensificar colores (var(--gold) → var(--purple-light)).
+- Ancho: fino (~0.5rem / 8px). No grueso ni invasivo.
+- Firefox fallback: scrollbar-width: thin; scrollbar-color: var(--gold-soft) rgba(2, 6, 23, 0.4);.
+
+Regla extra para móvil vertical: reservar margen derecho (padding-right: 0.75rem) en los contenedores scrolleables (ej. .deck-list) para que la barra nunca tape el texto de los nombres de carta.
+
+---
+
+## 16. Estilo Visual Definitivo (Ruta 1)
+
+Dirección estética confirmada: **línea clara + sombreado plano** (flat shading con outlines negros gruesos). Referencias visuales: *Hades*, *Slay the Spire*, *Inscryption* (cartas).
+
+Características obligatorias de todas las ilustraciones (cartas, enemigos, mapa, tienda, UI):
+
+- **Líneas negras gruesas** definiendo siluetas y detalles internos. Contraste alto contra fondos oscuros. Legibilidad garantizada incluso a tamaño pequeño (carta de mano).
+- **Rellenos planos saturados**, sin gradientes suaves ni texturas fotorealistas. Los colores provienen exclusivamente de la paleta oficial (sección 2). La ilustración aporta forma y contraste, no introduce nuevos tonos fuera de tokens existentes.
+- **Sombras duras laterales** (cel-shading básico): una sola dirección de luz implícita, sombra sólida de un tono inferior, sin penumbra difusa. Da volumen sin complicar producción.
+- **Sin ruido visual**: nada de grano de película, manchas de tinta aleatorias ni bordes irregulares tipo acuarela. Eso rompería la consistencia entre piezas producidas por diferentes manos (humana o IA).
+- **Coherencia temática**: todos los elementos comparten lenguaje gráfico. Si una carta tiene espadas estilizadas con filo recto, los iconos de ataque del HUD y las armas de los enemigos siguen esa misma geometría. Mezclar estilos (ej: pixel art en enemigos + vector en cartas) queda prohibido.
+
+Nota técnica: este estilo facilita la producción digital (vector o raster con capas planas) y escala bien a APK nativo sin pérdida de nitidez en pantallas HD. Permite generar assets vía IA generativa (Midjourney/Stable Diffusion) con prompts específicos de "flat shading dark fantasy lineart" y post-proceso manual mínimo para homogeneizar trazos.
+
+---
+
+## 17. Alcance Final (APK Nativo, Pool Ampliado, Arte Completo)
+
+El proyecto deja de ser prototipo/PWA ligera y evoluciona hacia **juego funcional distribuido como APK**, pensado inicialmente para uso personal pero con arquitectura preparada para futura comercialización.
+
+Implicaciones directas:
+
+- **Peso libre**: no hay restricción severa de tamaño. Se permiten PNG/JPG de alta resolución (≥512×768 px por carta), sin compresión agresiva ni spritesheets ultra-optimizadas. Prioridad: calidad visual > bytes ahorrados.
+- **Pool de cartas objetivo**: **40–60 únicas**. Subido desde el rango inicial de 30-45 porque ahora hay margen real de almacenamiento y desarrollo. Esto permite cubrir todos los tipos básicos (ataque, defensa, poder, curación, maldición/corrupto) con variantes suficientes para builds reconocibles (aggro, control, sustain, burst…).
+- **Arte completo**: ~50 cartas ilustradas + retratos/avatar de enemigos + iconografía de nodos del mapa procedural + UI de tienda/eventos + efectos visuales clave. Todo bajo Ruta 1 (sección 16). Producción gradual: empezar por pilares (~12–15 cartas fundamentales + primer boss), integrar, probar, expandir por sets temáticos.
+- **Motor visual previsto**: GSAP + Canvas híbrido sobre DOM actual (fase G del roadmap). Mantiene inversión existente (HTML/CSS/JS) y añade capas de animación/partículas/transiciones cinematográficas sin refactorizar a Phaser/PixiJS desde cero. Opción abierta: migrar a motor gráfico puro si mañana se quisiera producción más ambiciosa (multijugador, shaders avanzados), pero hoy no es requisito.
+- **Distribución**: empaquetado mediante Capacitor/Cordova para Android (APK). iOS posible pero secundario. Web/PWA sigue siendo canal de prueba rápido, pero el target final es instalación local nativa.
+- **Comercialización**: no prioritaria ahora, pero scope diseñado para que mañana sea publicable sin rehacer cimientos técnicos ni estéticos.
+
+Principio operativo: cada decisión técnica o artística debe responder a *"¿esto acerca el juego a un producto terminable y vendible?"*. Si la respuesta es no, se reconsidera antes de implementar.
