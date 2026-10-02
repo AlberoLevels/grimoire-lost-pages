@@ -1698,3 +1698,142 @@ h3,
 .continue-actions .ritual-button {
   width: 100%;
 }
+/* ==========================================================================
+   B2: INTENCIÓN ENEMIGA (glifo arcano + número + etiqueta, teñido por tipo)
+   ========================================================================== */
+
+.enemy-intent-card {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid rgba(251, 191, 36, 0.30);
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(160deg, rgba(30, 41, 59, 0.7), rgba(2, 6, 23, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.intent-glyph {
+  flex: 0 0 auto;
+  width: 1.45rem;
+  height: 1.45rem;
+  display: grid;
+  place-items: center;
+}
+
+.intent-glyph svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.intent-value {
+  flex: 0 0 auto;
+  font-family: var(--font-strong);
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  line-height: 1;
+}
+
+.intent-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-title);
+  font-size: clamp(0.6rem, 1.9vw, 0.82rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ataque: rojo sangre */
+.intent-attack {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: var(--blood);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 14px var(--blood-glow);
+}
+.intent-attack .intent-value { color: var(--blood); }
+
+/* Bloqueo: azul escudo */
+.intent-block {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: var(--shield);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 14px rgba(56, 189, 248, 0.18);
+}
+.intent-block .intent-value { color: var(--shield); }
+
+/* Quemadura: naranja llama (mismo tono que .float-text.burn, sin inventar token) */
+.intent-burn {
+  border-color: rgba(251, 146, 60, 0.5);
+  color: #fb923c;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 14px rgba(251, 146, 60, 0.2);
+}
+.intent-burn .intent-value { color: #fb923c; }
+
+/* Efectos ACTUALES del enemigo (bloqueo que ya tiene / quemadura que le metiste) */
+.enemy-current-effects {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: flex-end;
+  margin-top: 0.15rem;
+}
+/* ==========================================================================
+   SCROLLBAR COHERENTE CON EL GRIMORIO (overlay Grimorio/Cenizas)
+   ========================================================================== */
+
+/* Estilizar la barra de scroll dentro del listado de cartas */
+.deck-list::-webkit-scrollbar {
+  width: 0.5rem;
+}
+
+.deck-list::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.4);
+  border-radius: 999px;
+}
+
+.deck-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--gold-soft), rgba(168, 85, 247, 0.6));
+  border-radius: 999px;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.deck-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--gold), var(--purple-light));
+}
+
+/* Firefox: misma coherencia visual */
+.deck-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-soft) rgba(2, 6, 23, 0.4);
+}
+
+/* Móvil: reservar margen derecho para que la barra NO tape los nombres */
+@media (orientation: portrait) {
+  .deck-list {
+    padding-right: 0.75rem; /* espacio extra = ancho de la barra + aire */
+  }
+}
+/* ==========================================================================
+   OCULTAR LA × DE CERRAR EN GRIMORIO/CENIZAS (móvil vertical)
+   En portrait el botón arriba-derecha queda lejos del dedo o tapado por el notch.
+   Ya existe el botón "Cerrar" abajo (#deck-close-bottom), así que la × es redundante.
+   En PC sí se mantiene visible (ratón + ventana grande).
+   ========================================================================== */
+
+@media (orientation: portrait) {
+  #close-deck {
+    display: none;
+  }
+}
