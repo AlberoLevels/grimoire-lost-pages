@@ -233,11 +233,23 @@
   function getBlock() { return num(state?.block ?? state?.playerBlock ?? state?.shield); }
   function getBurn() { return num(state?.burn ?? state?.playerBurn); }
   function getEnemyBlock() { return num(state?.enemy?.block ?? state?.enemyBlock); }
-  // A2: la lógica guarda la quemadura enemiga en enemyBurnStacks; hay que leerla
-  // también aquí o el badge/float de quemadura del enemigo no se muestran nunca.
+  // A2: la lógica guarda la quemadura enemiga en enemyBurnStacks.
   function getEnemyBurn() { return num(state?.enemy?.burn ?? state?.enemyBurn ?? state?.enemyBurnStacks); }
   function cardCost(card) { return num(card?.cost); }
   function canPlayCard(card) { return cardCost(card) <= getEnergy(); }
+
+  // B2: intención futura del enemigo (la dejó B1 en state.enemy.intent).
+  function getEnemyIntent() {
+    const intent = state?.enemy?.intent;
+    if (!intent || typeof intent !== "object") return null;
+    const kind = String(intent.kind || "").toLowerCase();
+    if (kind !== "attack" && kind !== "block" && kind !== "burn") return null;
+    return {
+      kind,
+      value: num(intent.value),
+      label: intent.label || (kind === "attack" ? "Ataque" : kind === "block" ? "Bloqueo" : "Quemadura")
+    };
+  }
 
   function typeLabel(card) {
     const type = String(card?.type || "").toLowerCase();
@@ -324,6 +336,66 @@
     container.appendChild(badge);
   }
 
+  // B2: glifo arcano de la intención (trazo con currentColor, coherente con el ojo).
+  function intentGlyph(kind) {
+    if (kind === "block") {
+      return `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3 L19 6 L19 12 C19 16.5 15.5 19.8 12 21 C8.5 19.8 5 16.5 5 12 L5 6 Z"
+                fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+          <path d="M12 6.4 L12 18.4" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.55" />
+        </svg>`;
+    }
+    if (kind === "burn") {
+      return `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3 C13.8 6.6 16.8 8 16.2 12.4 C15.8 15.6 13.6 18 12 20.6 C10.4 18 8.2 15.6 7.8 12.4 C7.2 8.4 10.2 7 12 3 Z"
+                fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          <path d="M12 9.4 C12.9 11 13.2 12.2 12.4 13.8 C12 14.6 11.4 13.9 11.4 13 C11.4 11.8 11.2 11 12 9.4 Z"
+                fill="currentColor" opacity="0.5" />
+        </svg>`;
+    }
+    // attack (espada/daga)
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 3 L14.2 13 L12 15.2 L9.8 13 Z"
+              fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+        <path d="M8.2 13.6 L15.8 13.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        <path d="M12 15.2 L12 19.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        <circle cx="12" cy="20.4" r="1.1" fill="currentColor" />
+      </svg>`;
+  }
+
+  function buildIntentElement(intent) {
+    const card = document.createElement("div");
+    card.className = `enemy-intent-card intent-${intent.kind}`;
+    card.setAttribute("role", "img");
+    card.setAttribute(
+      "aria-label",
+      `El enemigo preparará ${intent.label} ${intent.value}`
+    );
+
+    const glyph = document.createElement("span");
+    glyph.className = "intent-glyph";
+    glyph.setAttribute("aria-hidden", "true");
+    glyph.innerHTML = intentGlyph(intent.kind);
+
+    const value = document.createElement("span");
+    value.className = "intent-value";
+    value.setAttribute("aria-hidden", "true");
+    value.textContent = intent.value;
+
+    const label = document.createElement("span");
+    label.className = "intent-label";
+    label.setAttribute("aria-hidden", "true");
+    label.textContent = intent.label;
+
+    card.appendChild(glyph);
+    card.appendChild(value);
+    card.appendChild(label);
+    return card;
+  }
+
   function renderHUD() {
     if (!state) return;
 
@@ -344,10 +416,24 @@
     if (els.enemyHp) {
       els.enemyHp.textContent = `${getEnemyHp()}`;
     }
+
     if (els.enemyIntent) {
       els.enemyIntent.innerHTML = "";
-      addBadge(els.enemyIntent, "Bloqueo", getEnemyBlock(), "block");
-      addBadge(els.enemyIntent, "Quemadura", getEnemyBurn(), "burn");
+
+      // B2: intención FUTURA destacada (solo si el enemigo vive).
+      const intent = getEnemyIntent();
+      if (intent && getEnemyHp() > 0) {
+        els.enemyIntent.appendChild(buildIntentElement(intent));
+      }
+
+      // Efectos ACTUALES del enemigo (bloqueo que ya tiene / quemadura que le metiste).
+      const effectsRow = document.createElement("div");
+      effectsRow.className = "enemy-current-effects";
+      addBadge(effectsRow, "Bloqueo", getEnemyBlock(), "block");
+      addBadge(effectsRow, "Quemadura", getEnemyBurn(), "burn");
+      if (effectsRow.childNodes.length > 0) {
+        els.enemyIntent.appendChild(effectsRow);
+      }
     }
   }
 
@@ -684,7 +770,7 @@
       }
       const instance = GameState.fromSave(data);
       if (!instance) {
-        clearSave(); // save corrupto o de otra versión -> descartar limpio
+        clearSave();
         return null;
       }
       return instance;
@@ -714,8 +800,6 @@
     }
   }
 
-  // Tras cada acción: si el combate terminó (overlay de resultado visible) se borra
-  // el save; si no, se guarda el progreso.
   function persistAfterAction() {
     if (isResultVisible()) {
       clearSave();
@@ -967,7 +1051,6 @@
     initLookEffects();
     setMessage("Pulsa “Abrir el Grimorio” para comenzar.");
 
-    // A.2: si hay una partida sin cerrar, preguntar antes de nada.
     const loaded = peekSave();
     if (loaded) {
       pendingLoadedState = loaded;
