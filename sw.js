@@ -3,7 +3,7 @@
    Versión v4 - Rutas relativas seguras para GitHub Pages
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v4";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v5";
 
 // Lista de assets críticos. Todas rutas relativas desde la raíz del SW.
 const CORE_ASSETS = [
