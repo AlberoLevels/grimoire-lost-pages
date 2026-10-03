@@ -108,20 +108,54 @@
 
     </main>
 
-    <!-- Overlay: intro narrativa -->
-    <div id="intro-screen" class="overlay intro-screen" role="dialog" aria-modal="true" aria-labelledby="intro-title">
-        <div class="overlay-card intro-card">
-            <h1 id="intro-title">Grimoire<span class="title-sep" aria-hidden="true"></span>Lost Pages</h1>
-            <p class="intro-text">
-                El grimorio fue rasgado en mil páginas perdidas.
-                Cada carta es un hechizo olvidado.
-                Cada partida, una tentativa de reescribir el destino...
-                o ser reescrito por él.
-            </p>
-            <button id="start-game" class="ritual-button secondary-button" type="button">
-                Abrir el Grimorio
-            </button>
-        </div>
+    <!-- Overlay: Menú Principal / Hub Narrativo -->
+    <div id="intro-screen" class="overlay menu-hub" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+        
+        <!-- Zona Izquierda: Navegación Funcional -->
+        <aside class="menu-nav-panel">
+            <h1 id="intro-title" class="menu-logo">Grimoire<span class="title-sep" aria-hidden="true"></span>Lost Pages</h1>
+            
+            <nav class="menu-actions" aria-label="Opciones principales">
+                <button id="start-game" class="ritual-button primary-menu-btn" type="button">
+                    Abrir el Grimorio
+                </button>
+                
+                <button id="continue-game" class="ritual-button secondary-menu-btn" type="button" hidden>
+                    Continuar Ritual
+                </button>
+                
+                <div class="menu-divider" aria-hidden="true"></div>
+                
+                <div class="menu-secondary-group">
+                    <button id="open-history" class="text-link-btn" type="button">Cronología</button>
+                    <button id="open-settings" class="text-link-btn" type="button">Ajustes</button>
+                    <button id="open-lore" class="text-link-btn" type="button">Lore</button>
+                </div>
+            </nav>
+            
+            <footer class="menu-footer">
+                <p>v0.1 Alpha • © 2026 AlberoLevels. Todos los derechos reservados.</p>
+            </footer>
+        </aside>
+
+        <!-- Zona Derecha: Artefacto Viviente (Esfera Arcana) -->
+        <section class="menu-artifact-stage" aria-hidden="true">
+            <!-- Capa de partículas confinada a esta zona -->
+            <div id="artifact-particles" class="particle-container"></div>
+            
+            <!-- Contenedor central de la esfera -->
+            <div class="arcane-orb-wrapper">
+                <!-- Anillo rúnico exterior -->
+                <div class="orb-ring outer-ring"></div>
+                <div class="orb-ring inner-ring"></div>
+                
+                <!-- Núcleo luminoso -->
+                <div class="orb-core">
+                    <span id="menu-star-glyph" class="star-glyph">✦</span>
+                </div>
+            </div>
+        </section>
+
     </div>
 
     <!-- Overlay: victoria / derrota -->
@@ -130,7 +164,7 @@
             <h2 id="result-title">Victoria</h2>
             <p id="result-text">Has recuperado una página perdida.</p>
             <button id="restart-game" class="ritual-button secondary-button" type="button">
-                Reabrir el Grimorio
+                Volver al Grimorio
             </button>
         </div>
     </div>
@@ -161,6 +195,39 @@
 
             <button id="deck-close-bottom" class="ritual-button secondary-button" type="button">
                 Cerrar
+            </button>
+        </div>
+    </div>
+
+    <!-- M1: sub-pantalla de Cronología (será rellenada en M3) -->
+    <div id="history-screen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="history-title" hidden>
+        <div class="overlay-card">
+            <h2 id="history-title">Cronología</h2>
+            <p class="subscreen-placeholder">Próximamente: tus rituales pasados.</p>
+            <button id="close-history" class="ritual-button secondary-button" type="button">
+                Volver
+            </button>
+        </div>
+    </div>
+
+    <!-- M1: sub-pantalla de Ajustes (será rellenada en M2) -->
+    <div id="settings-screen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+        <div class="overlay-card">
+            <h2 id="settings-title">Ajustes</h2>
+            <p class="subscreen-placeholder">Próximamente: movimiento, contraste, borrar progreso.</p>
+            <button id="close-settings" class="ritual-button secondary-button" type="button">
+                Volver
+            </button>
+        </div>
+    </div>
+
+    <!-- M1: sub-pantalla de Lore (será rellenada en M4) -->
+    <div id="lore-screen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="lore-title" hidden>
+        <div class="overlay-card">
+            <h2 id="lore-title">Lore del Grimorio</h2>
+            <p class="subscreen-placeholder">Próximamente: las páginas olvidadas del libro.</p>
+            <button id="close-lore" class="ritual-button secondary-button" type="button">
+                Volver
             </button>
         </div>
     </div>
