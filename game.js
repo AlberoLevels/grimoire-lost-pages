@@ -1,6 +1,9 @@
 (() => {
   "use strict";
 
+  // G0.6: tope de mano (espejo del HAND_MAX de logic.js, para feedback de UI).
+  const HAND_MAX = 10;
+
   const els = {
     game: document.getElementById("game"),
     battlefield: document.getElementById("battlefield"),
@@ -66,20 +69,25 @@
   const SAVE_KEY = "grimoire-save";
   const FIRST_TIME_KEY = "grimoire-first-time";
   const SETTINGS_KEY = "grimoire-settings";
-  const HISTORY_KEY = "grimoire-history"; // reservada para M3 (Cronología)
+  const HISTORY_KEY = "grimoire-history"; // reservada para M3/E4 (Cronología)
 
   let pendingLoadedState = null;
   let saveToastEl = null;
   let saveToastTimer = null;
 
-  /* ==================== AJUSTES (M2) ==================== */
+  /* ==================== AJUSTES (M2 + G1 audio) ==================== */
 
   const systemReduceMotion =
     window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  function clamp01(v) {
+    const p = Number(v);
+    if (!Number.isFinite(p)) return 0;
+    return Math.min(1, Math.max(0, p));
+  }
+
   function loadSettings() {
-    // Defaults: el toggle de movimiento nace reflejando al sistema (decisión M2).
-    const defaults = { reduceMotion: systemReduceMotion, oled: false };
+    const defaults = { reduceMotion: systemReduceMotion, oled: false, music: 0.7, sfx: 0.9, muted: false };
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
       if (!raw) return defaults;
@@ -87,7 +95,10 @@
       if (!parsed || typeof parsed !== "object") return defaults;
       return {
         reduceMotion: parsed.reduceMotion === true,
-        oled: parsed.oled === true
+        oled: parsed.oled === true,
+        music: typeof parsed.music === "number" ? clamp01(parsed.music) : defaults.music,
+        sfx: typeof parsed.sfx === "number" ? clamp01(parsed.sfx) : defaults.sfx,
+        muted: parsed.muted === true
       };
     } catch (e) {
       return defaults;
@@ -100,9 +111,24 @@
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
   }
 
-  // Estado EFECTIVO de reducción: sistema O elección del usuario.
   function isMotionReduced() {
     return systemReduceMotion || settings.reduceMotion === true;
+  }
+
+  /* ---- Puentes seguros hacia AudioFX (G1). Si el módulo no existe, no-op. ---- */
+  function sfx(name) {
+    if (window.AudioFX && typeof window.AudioFX.play === "function") window.AudioFX.play(name);
+  }
+  function setAudioIntensity(mode) {
+    if (window.AudioFX && typeof window.AudioFX.setIntensity === "function") window.AudioFX.setIntensity(mode);
+  }
+  function applyAudioSettings() {
+    if (window.AudioFX && typeof window.AudioFX.applySettings === "function") {
+      window.AudioFX.applySettings({ music: settings.music, sfx: settings.sfx, muted: settings.muted });
+    }
+  }
+  function initAudio() {
+    if (window.AudioFX && typeof window.AudioFX.init === "function") window.AudioFX.init();
   }
 
   function applySettingsToDOM() {
@@ -118,6 +144,7 @@
       menuTargetX = 0; menuTargetY = 0;
       menuCurrentX = 0; menuCurrentY = 0;
     }
+    applyAudioSettings();
   }
 
   /* ==================== EFECTO AMBIENTAL: MIRADA ARCANA ==================== */
@@ -257,6 +284,15 @@
     return "Página";
   }
 
+  /* G1: sonido de cast según el tipo de carta. */
+  function cardSound(card) {
+    if (!card) return "card_skill";
+    if (card.type === "attack") return "card_attack";
+    if (card.type === "power") return "card_power";
+    if (hasEffect(card, "heal")) return "card_heal";
+    return "card_skill";
+  }
+
   /* ==================== MAZO / DESCARTE ==================== */
   function firstArray(...vals) { for (const v of vals) if (Array.isArray(v)) return v; return null; }
   function firstNumber(...vals) { for (const v of vals) { if (v == null) continue; const p = Number(v); if (Number.isFinite(p)) return p; } return null; }
@@ -304,7 +340,42 @@
       addBadge(er, "Bloqueo", getEnemyBlock(), "block"); addBadge(er, "Quemadura", getEnemyBurn(), "burn");
       if (er.childNodes.length > 0) els.enemyIntent.appendChild(er);
     }
+    renderCombatReadouts();
   }
+
+  /* ==================== G0 / G0.5: LECTURA DE COMBATE (barras de vida + turno) ==================== */
+  let enemyHpFillEl = null;
+  let playerHpFillEl = null;
+  let turnLabelEl = null;
+
+  function renderCombatReadouts() {
+    if (!enemyHpFillEl) enemyHpFillEl = document.getElementById("enemy-hp-fill");
+    if (!playerHpFillEl) playerHpFillEl = document.getElementById("player-hp-fill");
+    if (!turnLabelEl) turnLabelEl = document.getElementById("turn-label");
+    if (enemyHpFillEl) {
+      const max = num(state?.enemy?.maxHp, 0) || num(state?.enemy?.hp, 0) || 1;
+      const pct = Math.max(0, Math.min(1, getEnemyHp() / max));
+      enemyHpFillEl.style.width = `${(pct * 100).toFixed(1)}%`;
+    }
+    if (playerHpFillEl) {
+      const max = getMaxPlayerHp() || 1;
+      const pct = Math.max(0, Math.min(1, getPlayerHp() / max));
+      playerHpFillEl.style.width = `${(pct * 100).toFixed(1)}%`;
+    }
+    if (turnLabelEl) turnLabelEl.textContent = `Turno ${num(state?.turnCount, 0)}`;
+  }
+
+  /* ==================== G0.6: FEEDBACK MANO LLENA ==================== */
+  function checkHandFull(prefix) {
+    if (!state || !Array.isArray(state.hand)) return;
+    if (state.hand.length >= HAND_MAX) {
+      const text = prefix
+        ? `${prefix} La mano está llena (${HAND_MAX}).`
+        : `La mano está llena (${HAND_MAX}). Las páginas sobrantes se vuelven ceniza.`;
+      setMessage(text);
+    }
+  }
+
   function renderDeckStatus() { if (els.grimoireCount) els.grimoireCount.textContent = getDrawCount(); if (els.ashesCount) els.ashesCount.textContent = getDiscardCount(); }
 
   /* ==================== TEXTOS FLOTANTES ==================== */
@@ -317,14 +388,16 @@
     els.floats.appendChild(f); setTimeout(() => f.remove(), 950);
   }
   function snapshot() { return { playerHp: getPlayerHp(), enemyHp: getEnemyHp(), energy: getEnergy(), block: getBlock(), burn: getBurn(), enemyBlock: getEnemyBlock(), enemyBurn: getEnemyBurn(), handLength: Array.isArray(state?.hand) ? state.hand.length : 0 }; }
+
+  // G1: además de los floats, dispara los SFX de impacto correspondientes.
   function showDiffs(before, after) {
-    const ed = before.enemyHp - after.enemyHp; if (ed > 0) spawnFloat(`-${ed}`, "damage", "enemy");
-    const pd = before.playerHp - after.playerHp; if (pd > 0) spawnFloat(`-${pd}`, "damage", "player");
+    const ed = before.enemyHp - after.enemyHp; if (ed > 0) { spawnFloat(`-${ed}`, "damage", "enemy"); sfx("enemy_hit"); }
+    const pd = before.playerHp - after.playerHp; if (pd > 0) { spawnFloat(`-${pd}`, "damage", "player"); sfx("player_hit"); }
     const ph = after.playerHp - before.playerHp; if (ph > 0) spawnFloat(`+${ph}`, "heal", "player");
-    const bg = after.block - before.block; if (bg > 0) spawnFloat(`+${bg} bloqueo`, "block", "player");
-    const brg = after.burn - before.burn; if (brg > 0) spawnFloat(`${brg} quemadura`, "burn", "player");
+    const bg = after.block - before.block; if (bg > 0) { spawnFloat(`+${bg} bloqueo`, "block", "player"); sfx("block"); }
+    const brg = after.burn - before.burn; if (brg > 0) { spawnFloat(`${brg} quemadura`, "burn", "player"); sfx("burn"); }
     const ebg = after.enemyBlock - before.enemyBlock; if (ebg > 0) spawnFloat(`+${ebg} bloqueo`, "block", "enemy");
-    const ebrg = after.enemyBurn - before.enemyBurn; if (ebrg > 0) spawnFloat(`${ebrg} quemadura`, "burn", "enemy");
+    const ebrg = after.enemyBurn - before.enemyBurn; if (ebrg > 0) { spawnFloat(`${ebrg} quemadura`, "burn", "enemy"); sfx("burn"); }
   }
 
   /* ==================== CARTAS (mano) ==================== */
@@ -336,7 +409,7 @@
     btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12 C 6 5.5, 18 5.5, 21.5 12 C 18 18.5, 6 18.5, 2.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle class="eye-iris" cx="12" cy="12" r="3.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="#05070f"/><circle cx="13.1" cy="10.9" r="0.7" fill="#f8fafc" opacity="0.85"/></svg>`;
     btn.addEventListener("pointerdown", (e) => e.stopPropagation());
     btn.addEventListener("pointerup", (e) => e.stopPropagation());
-    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openInspect(card); });
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); sfx("ui_click"); openInspect(card); });
     return btn;
   }
   function buildMechHtml(card) {
@@ -406,7 +479,7 @@
     body.innerHTML = `<div class="page-header"><span class="page-cost">${escapeHtml(cardCost(card))}</span><h3 class="page-name">${escapeHtml(card?.name || "Página sin nombre")}</h3></div><p class="page-type">${escapeHtml(typeLabel(card))}</p>${buildMechHtml(card)}<p class="page-desc">${escapeHtml(card?.desc || "Sin descripción.")}</p>`;
     els.inspectCard.replaceChildren(art, body);
   }
-  function openInspect(card) { if (!els.inspect || !els.inspectCard) return; fillInspectCard(card); els.inspect.hidden = false; }
+  function openInspect(card) { if (!els.inspect || !els.inspectCard) return; sfx("ui_click"); fillInspectCard(card); els.inspect.hidden = false; }
   function closeInspect() { if (els.inspect) els.inspect.hidden = true; }
 
   /* ==================== OVERLAY GRIMORIO / CENIZAS ==================== */
@@ -425,6 +498,7 @@
   }
   function openDeckOverlay(mode) {
     if (!els.deckOverlay || !els.deckList) return;
+    sfx("ui_click");
     const isG = mode === "grimoire";
     if (els.deckTitle) els.deckTitle.textContent = isG ? "Grimorio" : "Cenizas";
     if (els.deckSubtitle) els.deckSubtitle.textContent = isG ? "Páginas que aún puedes robar." : "Páginas ya usadas o descartadas.";
@@ -487,6 +561,7 @@
     }
     refreshContinueButton();
     setMenuVisualMode(true);
+    setAudioIntensity("menu"); // G1
   }
 
   function showCombat() {
@@ -509,6 +584,7 @@
         }, 420);
       }
     }
+    setAudioIntensity("combat"); // G1
   }
 
   function hideAllSubScreens() {
@@ -521,6 +597,7 @@
     if (!el) return;
     hideAllSubScreens();
     el.hidden = false;
+    sfx("ui_click"); // G1
     if (el === els.settingsScreen) syncSettingsUI();
   }
 
@@ -543,7 +620,7 @@
     `;
     document.body.appendChild(ov);
     ov.querySelector("#confirm-discard-yes").addEventListener("click", () => { ov.remove(); onYes(); });
-    ov.querySelector("#confirm-discard-no").addEventListener("click", () => { ov.remove(); });
+    ov.querySelector("#confirm-discard-no").addEventListener("click", () => { ov.remove(); sfx("ui_click"); });
   }
 
   function startNewRun() {
@@ -554,10 +631,15 @@
     showCombat();
     closeInspect(); closeDeckOverlay(); resetSensorNeutral();
     renderAll();
-    setMessage("El grimorio se abre. Recupera las páginas perdidas.");
+    sfx("draw"); // G1: robo inicial
+    checkHandFull("El grimorio se abre.");
+    if (state && Array.isArray(state.hand) && state.hand.length < HAND_MAX) {
+      setMessage("El grimorio se abre. Recupera las páginas perdidas.");
+    }
   }
 
   function handleNewRunClick() {
+    sfx("ui_click"); // G1
     if (hasSave()) {
       showConfirmDiscard(() => { clearSave(); startNewRun(); });
     } else {
@@ -572,6 +654,7 @@
     showCombat();
     closeInspect(); closeDeckOverlay(); resetSensorNeutral();
     renderAll();
+    sfx("draw"); // G1
     setMessage("El ritual continúa donde lo dejaste.");
   }
 
@@ -582,12 +665,12 @@
     ov.setAttribute("role","dialog"); ov.setAttribute("aria-modal","true"); ov.setAttribute("aria-labelledby","continue-title");
     ov.innerHTML = `<div class="overlay-card continue-card"><h2 id="continue-title">El grimorio recuerda</h2><p>Queda un ritual sin cerrar entre sus páginas. ¿Deseas continuarlo, o abrir el libro de nuevo?</p><div class="continue-actions"><button id="continue-resume" class="ritual-button" type="button">Continuar el ritual</button><button id="continue-new" class="ritual-button secondary-button" type="button">Nueva página</button></div></div>`;
     document.body.appendChild(ov);
-    ov.querySelector("#continue-resume").addEventListener("click", continueFromSave);
-    ov.querySelector("#continue-new").addEventListener("click", () => { hideContinueOverlay(); startNewRun(); });
+    ov.querySelector("#continue-resume").addEventListener("click", () => { sfx("ui_click"); continueFromSave(); });
+    ov.querySelector("#continue-new").addEventListener("click", () => { sfx("ui_click"); hideContinueOverlay(); startNewRun(); });
   }
   function hideContinueOverlay() { const el = document.getElementById("continue-overlay"); if (el) el.remove(); }
 
-  /* ==================== M2: UI DE AJUSTES ==================== */
+  /* ==================== M2 + G1: UI DE AJUSTES (toggles + sliders de audio) ==================== */
   function buildSettingsUI() {
     const card = els.settingsScreen ? els.settingsScreen.querySelector(".overlay-card") : null;
     if (!card) return;
@@ -613,6 +696,28 @@
         <input type="checkbox" id="setting-oled" class="setting-toggle">
         <span class="setting-switch" aria-hidden="true"></span>
       </label>
+      <label class="setting-row setting-row-slider">
+        <span class="setting-text">
+          <span class="setting-name">Música</span>
+          <span class="setting-desc">Volumen del pad ambiental del grimorio.</span>
+        </span>
+        <input type="range" id="setting-music" class="setting-slider" min="0" max="100" step="5">
+      </label>
+      <label class="setting-row setting-row-slider">
+        <span class="setting-text">
+          <span class="setting-name">Efectos</span>
+          <span class="setting-desc">Volumen de los SFX del ritual.</span>
+        </span>
+        <input type="range" id="setting-sfx" class="setting-slider" min="0" max="100" step="5">
+      </label>
+      <label class="setting-row">
+        <span class="setting-text">
+          <span class="setting-name">Silencio</span>
+          <span class="setting-desc">Apaga todo el sonido del grimorio.</span>
+        </span>
+        <input type="checkbox" id="setting-mute" class="setting-toggle">
+        <span class="setting-switch" aria-hidden="true"></span>
+      </label>
       <button id="setting-wipe" class="ritual-button danger-button" type="button">Borrar progreso</button>
     `;
 
@@ -623,25 +728,57 @@
       settings.reduceMotion = e.target.checked === true;
       saveSettings();
       applySettingsToDOM();
+      sfx("ui_click");
     });
     body.querySelector("#setting-oled").addEventListener("change", (e) => {
       settings.oled = e.target.checked === true;
       saveSettings();
       applySettingsToDOM();
+      sfx("ui_click");
     });
+
+    // G1: sliders de audio (actualizan en vivo al arrastrar, clic al soltar).
+    const musicSlider = body.querySelector("#setting-music");
+    const sfxSlider = body.querySelector("#setting-sfx");
+    const muteToggle = body.querySelector("#setting-mute");
+    musicSlider.addEventListener("input", (e) => {
+      settings.music = clamp01(Number(e.target.value) / 100);
+      saveSettings();
+      applyAudioSettings();
+    });
+    musicSlider.addEventListener("change", () => sfx("ui_click"));
+    sfxSlider.addEventListener("input", (e) => {
+      settings.sfx = clamp01(Number(e.target.value) / 100);
+      saveSettings();
+      applyAudioSettings();
+    });
+    sfxSlider.addEventListener("change", () => sfx("ui_click"));
+    muteToggle.addEventListener("change", (e) => {
+      settings.muted = e.target.checked === true;
+      saveSettings();
+      applyAudioSettings();
+      if (!settings.muted) sfx("ui_click");
+    });
+
     body.querySelector("#setting-wipe").addEventListener("click", showWipeConfirm);
   }
 
   function syncSettingsUI() {
     const rm = document.getElementById("setting-reduce-motion");
     const ol = document.getElementById("setting-oled");
-    // El toggle de movimiento muestra el estado EFECTIVO (sistema o app).
+    const mu = document.getElementById("setting-music");
+    const sx = document.getElementById("setting-sfx");
+    const mt = document.getElementById("setting-mute");
     if (rm) rm.checked = isMotionReduced();
     if (ol) ol.checked = settings.oled === true;
+    if (mu) mu.value = String(Math.round(settings.music * 100));
+    if (sx) sx.value = String(Math.round(settings.sfx * 100));
+    if (mt) mt.checked = settings.muted === true;
   }
 
   function showWipeConfirm() {
     if (document.getElementById("wipe-confirm-overlay")) return;
+    sfx("ui_click");
     const ov = document.createElement("div");
     ov.id = "wipe-confirm-overlay";
     ov.className = "overlay";
@@ -659,7 +796,7 @@
     `;
     document.body.appendChild(ov);
     ov.querySelector("#wipe-yes").addEventListener("click", () => { ov.remove(); wipeAllProgress(); });
-    ov.querySelector("#wipe-no").addEventListener("click", () => ov.remove());
+    ov.querySelector("#wipe-no").addEventListener("click", () => { ov.remove(); sfx("ui_click"); });
   }
 
   function wipeAllProgress() {
@@ -669,7 +806,7 @@
       localStorage.removeItem(SETTINGS_KEY);
       localStorage.removeItem(FIRST_TIME_KEY);
     } catch (e) {}
-    settings = { reduceMotion: false, oled: false };
+    settings = { reduceMotion: false, oled: false, music: 0.7, sfx: 0.9, muted: false };
     applySettingsToDOM();
     pendingLoadedState = null;
     state = null;
@@ -774,11 +911,20 @@
     const card = state?.hand?.[index]; if (!card) return;
     if (!canPlayCard(card)) { setMessage("No hay tinta suficiente para esta página."); shake(element); return; }
     const before = snapshot();
+    const drawsFromCard = Array.isArray(card.effects)
+      ? card.effects.filter((e) => e.type === "draw").reduce((acc, e) => acc + (Number(e.value) || 0), 0)
+      : 0;
     let result;
     try { result = state.playCard(index); } catch (e) { console.error(e); setMessage("El grimorio rechaza esa página."); shake(element); return; }
     if (result === false) { setMessage("No se pudo lanzar la página."); shake(element); return; }
+    sfx(cardSound(card)); // G1: sonido de cast según tipo
     const after = snapshot(); showDiffs(before, after);
-    setMessage(`Has usado: ${card.name || "una página"}.`);
+    if (drawsFromCard > 0) {
+      sfx("draw"); // G1
+      checkHandFull(`Has usado ${card.name || "una página"}.`);
+    } else {
+      setMessage(`Has usado: ${card.name || "una página"}.`);
+    }
     renderAll(); checkResult(); persistAfterAction();
   }
   function endTurn() {
@@ -786,9 +932,14 @@
     const before = snapshot();
     try { state.endTurn(); } catch (e) { console.error(e); setMessage("El ritual se ha interrumpido."); return; }
     const after = snapshot(); showDiffs(before, after);
+    sfx("turn_end"); // G1: campana de fin de turno
+    sfx("draw");     // G1: robo de la nueva mano
     if (getEnemyHp() <= 0) setMessage("La amenaza ha sido sellada.");
     else if (getPlayerHp() <= 0) setMessage("El grimorio te ha consumido.");
-    else setMessage("El enemigo ha actuado.");
+    else {
+      setMessage("El enemigo ha actuado.");
+      checkHandFull("El enemigo ha actuado.");
+    }
     renderAll(); checkResult(); persistAfterAction();
   }
 
@@ -801,6 +952,7 @@
       ? "Has sobrevivido al ritual y has recuperado una página perdida del grimorio."
       : "Tu vitalidad se ha agotado. El libro te incorpora como una página más.";
     els.result.hidden = false;
+    sfx(victory ? "victory" : "defeat"); // G1
   }
   function checkResult() {
     if (!state) return;
@@ -815,6 +967,7 @@
   function bindGlobalEvents() {
     els.start?.addEventListener("click", handleNewRunClick);
     els.continueGame?.addEventListener("click", () => {
+      sfx("ui_click"); // G1
       const loaded = peekSave();
       if (loaded) { pendingLoadedState = loaded; continueFromSave(); }
       else { refreshContinueButton(); }
@@ -822,17 +975,17 @@
     els.openHistory?.addEventListener("click", () => openSubScreen(els.historyScreen));
     els.openSettings?.addEventListener("click", () => openSubScreen(els.settingsScreen));
     els.openLore?.addEventListener("click", () => openSubScreen(els.loreScreen));
-    els.closeHistory?.addEventListener("click", () => { if (els.historyScreen) els.historyScreen.hidden = true; });
-    els.closeSettings?.addEventListener("click", () => { if (els.settingsScreen) els.settingsScreen.hidden = true; });
-    els.closeLore?.addEventListener("click", () => { if (els.loreScreen) els.loreScreen.hidden = true; });
-    els.restart?.addEventListener("click", showMenu);
+    els.closeHistory?.addEventListener("click", () => { sfx("ui_click"); if (els.historyScreen) els.historyScreen.hidden = true; });
+    els.closeSettings?.addEventListener("click", () => { sfx("ui_click"); if (els.settingsScreen) els.settingsScreen.hidden = true; });
+    els.closeLore?.addEventListener("click", () => { sfx("ui_click"); if (els.loreScreen) els.loreScreen.hidden = true; });
+    els.restart?.addEventListener("click", () => { sfx("ui_click"); showMenu(); });
     els.endTurn?.addEventListener("click", endTurn);
-    els.closeInspect?.addEventListener("click", closeInspect);
+    els.closeInspect?.addEventListener("click", () => { sfx("ui_click"); closeInspect(); });
     els.inspect?.addEventListener("click", (e) => { if (e.target === els.inspect) closeInspect(); });
     els.openGrimoire?.addEventListener("click", () => openDeckOverlay("grimoire"));
     els.openAshes?.addEventListener("click", () => openDeckOverlay("ashes"));
-    els.closeDeck?.addEventListener("click", closeDeckOverlay);
-    els.deckCloseBottom?.addEventListener("click", closeDeckOverlay);
+    els.closeDeck?.addEventListener("click", () => { sfx("ui_click"); closeDeckOverlay(); });
+    els.deckCloseBottom?.addEventListener("click", () => { sfx("ui_click"); closeDeckOverlay(); });
     els.deckOverlay?.addEventListener("click", (e) => { if (e.target === els.deckOverlay) closeDeckOverlay(); });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") { closeInspect(); closeDeckOverlay(); hideAllSubScreens(); }
@@ -842,8 +995,9 @@
   /* ==================== INIT ==================== */
   function init() {
     bindGlobalEvents();
+    initAudio();          // G1: registra desbloqueo por gesto + pausa en segundo plano
     initLookEffects();
-    applySettingsToDOM();
+    applySettingsToDOM(); // incluye applyAudioSettings()
     buildSettingsUI();
     try {
       if (!localStorage.getItem(FIRST_TIME_KEY)) {
