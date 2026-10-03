@@ -1,27 +1,21 @@
 /* ==========================================================================
-   GRIMOIRE: LOST PAGES — Motor de audio (G1 reescrito + saneado móvil)
+   GRIMOIRE: LOST PAGES — Motor de audio (G1 reescrito + corrección móvil)
    SFX y música mediante Web Audio API con MP3 reales desde assets/audio/.
    Expone window.AudioFX. No depende de game.js.
 
-   Correcciones principales:
-   - No se crea AudioContext hasta el primer gesto real del usuario.
-   - Los listeners de desbloqueo se mantienen hasta ctx.state === "running".
-   - Los MP3 se descargan como ArrayBuffer antes del gesto.
-   - Al desbloquear, se decodifica primero la música; los SFX van después,
-     escalonados, para evitar picos de CPU en Android.
-   - Las fuentes musicales arrancan con un pequeño lookahead y fade corto.
-   - El crossfade menú/combate no baja la pista actual si la destino aún
-     no está lista.
-   - visibilitychange usa fade + debounce antes de suspender el contexto.
-   - Los SFX no se decodifican “en caliente” durante el combate.
+   Corrección clave:
+   - No se crea AudioContext hasta el primer gesto del usuario.
+   - Los listeners de desbloqueo se mantienen hasta que ctx.state === "running".
+   - Se reintenta en pointerdown/touchend/click/keydown.
+   - Los MP3 se descargan como ArrayBuffer antes del gesto, pero se decodifican
+     solo cuando el contexto de audio existe y se desbloquea.
+   - El slider de volumen no es responsable de desbloquear el audio.
    ========================================================================== */
 
 (() => {
   "use strict";
 
   const AUDIO_BASE = "./assets/audio/";
-
-  const MUSIC_NAMES = ["music_menu", "music_combat"];
 
   const SFX_NAMES = [
     "ui_click",
@@ -39,34 +33,11 @@
     "defeat"
   ];
 
-  // Orden de decodificación de SFX tras la música: primero lo más frecuente.
-  const SFX_DECODE_ORDER = [
-    "ui_click",
-    "draw",
-    "enemy_hit",
-    "player_hit",
-    "card_attack",
-    "turn_end",
-    "block",
-    "burn",
-    "card_skill",
-    "card_power",
-    "card_heal",
-    "victory",
-    "defeat"
-  ];
+  const MUSIC_NAMES = ["music_menu", "music_combat"];
+  const ALL_NAMES = [...SFX_NAMES, ...MUSIC_NAMES];
 
-  const ALL_FETCH_NAMES = [...MUSIC_NAMES, ...SFX_DECODE_ORDER];
-
-  // Valores conservadores para móvil, sin warm-ups artificiales raros.
-  const START_LOOKAHEAD = 0.025;       // 25 ms: evita click de arranque seco.
-  const SFX_LOOKAHEAD = 0.005;         // 5 ms: micro-margen para SFX.
-  const MUSIC_START_FADE = 0.18;       // arranque inicial de música.
-  const MUSIC_CROSSFADE = 1.2;         // menú <-> combate.
-  const VISIBILITY_FADE_OUT = 0.18;    // al ocultar.
-  const VISIBILITY_FADE_IN = 0.22;     // al volver.
-  const HIDDEN_SUSPEND_DELAY = 500;    // debounce antes de suspender contexto.
-  const SFX_DECODE_DELAY = 120;        // separación entre decodificaciones SFX.
+  const MUSIC_START_FADE = 0.25;
+  const MUSIC_CROSSFADE = 1.2;
 
   let ctx = null;
   let masterGain = null;
@@ -75,27 +46,20 @@
 
   const rawBuffers = {};
   const audioBuffers = {};
-  const loaded = {};
   const loading = {};
+  const loaded = {};
   const failed = {};
   const decoding = {};
 
-  const music = {
-    menu: { gain: null, source: null },
-    combat: { gain: null, source: null }
-  };
+  let menuGain = null;
+  let combatGain = null;
+  let menuSource = null;
+  let combatSource = null;
 
   let unlockHandler = null;
   let unlockListenersBound = false;
   let contextRunning = false;
-  let resumeInProgress = false;
-
-  let musicEverStarted = false;
-  let sfxQueueStarted = false;
-  let sfxIndex = 0;
-
-  let foreground = 1;
-  let hiddenTimeout = null;
+  let musicInitialApplied = false;
   let visibilityBound = false;
 
   const mix = {
@@ -118,38 +82,27 @@
       (window.AudioContext || window.webkitAudioContext);
   }
 
-  function isMusicName(name) {
-    return name === "music_menu" || name === "music_combat";
-  }
-
-  function rampParam(param, value, fade) {
-    if (!ctx || !param) return;
-    const t = ctx.currentTime;
-    const target = Math.max(0, Number(value) || 0);
-    const duration = Math.max(0, Number(fade) || 0);
-
-    param.cancelScheduledValues(t);
-    param.setValueAtTime(param.value, t);
-
-    if (duration <= 0.01) {
-      param.setValueAtTime(target, t);
-    } else {
-      param.linearRampToValueAtTime(target, t + duration);
+  function ignorePromise(p) {
+    if (p && typeof p.then === "function") {
+      p.then(undefined, () => {});
     }
   }
 
   /* ==================== MEZCLA ==================== */
 
-  function applyMixValues(fade = 0.05) {
+  function applyMixValues() {
     if (!ctx || !masterGain || !musicGain || !sfxGain) return;
 
-    const masterTarget = mix.muted ? 0 : foreground;
-    const musicTarget = clamp01(mix.music) * 0.9;
-    const sfxTarget = clamp01(mix.sfx) * 0.9;
+    const t = ctx.currentTime;
 
-    rampParam(masterGain.gain, masterTarget, fade);
-    rampParam(musicGain.gain, musicTarget, fade);
-    rampParam(sfxGain.gain, sfxTarget, fade);
+    masterGain.gain.cancelScheduledValues(t);
+    masterGain.gain.linearRampToValueAtTime(mix.muted ? 0 : 1, t + 0.05);
+
+    musicGain.gain.cancelScheduledValues(t);
+    musicGain.gain.linearRampToValueAtTime(clamp01(mix.music) * 0.9, t + 0.05);
+
+    sfxGain.gain.cancelScheduledValues(t);
+    sfxGain.gain.linearRampToValueAtTime(clamp01(mix.sfx) * 0.9, t + 0.05);
   }
 
   /* ==================== CONTEXTO ==================== */
@@ -158,13 +111,7 @@
     if (ctx || !supportedAudioContext()) return ctx;
 
     const AC = window.AudioContext || window.webkitAudioContext;
-
-    try {
-      // Prioriza latencia baja en móvil cuando el navegador lo soporta.
-      ctx = new AC({ latencyHint: "interactive" });
-    } catch (e) {
-      ctx = new AC();
-    }
+    ctx = new AC();
 
     masterGain = ctx.createGain();
     musicGain = ctx.createGain();
@@ -174,8 +121,19 @@
     musicGain.connect(masterGain);
     sfxGain.connect(masterGain);
 
-    applyMixValues(0.01);
+    applyMixValues();
     return ctx;
+  }
+
+  function markContextRunning() {
+    if (contextRunning) {
+      applyIntensity(MUSIC_CROSSFADE);
+      return;
+    }
+
+    contextRunning = true;
+    removeUnlockListeners();
+    decodeAllLoaded();
   }
 
   /* ==================== DESCARGA RAW ==================== */
@@ -196,292 +154,183 @@
         loaded[name] = true;
         loading[name] = false;
 
-        if (contextRunning) {
-          if (isMusicName(name)) {
-            decodeName(name, null);
-          } else if (sfxQueueStarted) {
-            scheduleNextSfx(0);
-          }
-        }
+        if (ctx) decodeName(name);
       })
       .catch((error) => {
         failed[name] = true;
         loading[name] = false;
         console.warn("AudioFX: no se pudo descargar", url, error);
-
-        if (contextRunning) {
-          if (isMusicName(name)) {
-            maybeScheduleSfxQueue();
-            applyIntensityIfPossible();
-          } else if (sfxQueueStarted) {
-            scheduleNextSfx(0);
-          }
-        }
       });
   }
 
   /* ==================== DECODIFICACIÓN ==================== */
 
   function onDecoded(name) {
-    if (isMusicName(name)) {
-      maybeScheduleSfxQueue();
-      applyIntensityIfPossible();
+    if (String(name).indexOf("music_") === 0 && contextRunning) {
+      applyIntensity(musicInitialApplied ? MUSIC_CROSSFADE : MUSIC_START_FADE);
+      musicInitialApplied = true;
     }
   }
 
-  function decodeName(name, done) {
-    if (!ctx) {
-      if (done) done(false);
-      return;
-    }
-
-    if (audioBuffers[name]) {
-      if (done) done(true);
-      return;
-    }
-
-    if (failed[name]) {
-      if (done) done(false);
-      return;
-    }
-
-    if (decoding[name]) {
-      // Ya se está decodificando; no llamamos a done para no duplicar cola.
-      return;
-    }
+  function decodeName(name) {
+    if (!ctx) return;
+    if (!loaded[name] || failed[name] || decoding[name] || audioBuffers[name]) return;
 
     const arrayBuffer = rawBuffers[name];
-    if (!arrayBuffer) {
-      if (done) done(false);
-      return;
-    }
+    if (!arrayBuffer) return;
 
     decoding[name] = true;
 
-    const finishSuccess = (audioBuffer) => {
-      if (!decoding[name]) return;
+    const onSuccess = (audioBuffer) => {
+      if (decoding[name] === false) return;
       decoding[name] = false;
       audioBuffers[name] = audioBuffer;
       delete rawBuffers[name];
-      if (done) done(true);
       onDecoded(name);
     };
 
-    const finishError = (error) => {
-      if (!decoding[name]) return;
+    const onError = (error) => {
       decoding[name] = false;
       failed[name] = true;
-      delete rawBuffers[name];
       console.warn("AudioFX: no se pudo decodificar", name, error);
-      if (done) done(false);
-      onDecoded(name);
     };
 
     try {
-      const promise = ctx.decodeAudioData(arrayBuffer, finishSuccess, finishError);
+      // slice(0) evita problemas si el ArrayBuffer queda transferido/detached.
+      const promise = ctx.decodeAudioData(arrayBuffer.slice(0), onSuccess, onError);
 
-      // Algunos navegadores devuelven promesa además de usar callbacks.
       if (promise && typeof promise.then === "function") {
-        promise
-          .then((audioBuffer) => {
-            if (!audioBuffers[name] && !failed[name]) {
-              finishSuccess(audioBuffer);
-            }
-          })
-          .catch((error) => {
-            if (!failed[name]) {
-              finishError(error);
-            }
-          });
+        promise.then((audioBuffer) => {
+          if (!audioBuffers[name] && !failed[name]) onSuccess(audioBuffer);
+        }).catch((error) => {
+          if (!failed[name]) onError(error);
+        });
       }
     } catch (error) {
-      finishError(error);
+      onError(error);
     }
+  }
+
+  function decodeAllLoaded() {
+    ALL_NAMES.forEach(decodeName);
   }
 
   /* ==================== MÚSICA ==================== */
 
-  function ensureMusicGain(name) {
-    if (!ctx || !musicGain) return null;
+  function ensureMusicGains() {
+    if (!ctx || !musicGain) return false;
 
-    const track = music[name];
-    if (!track.gain) {
-      track.gain = ctx.createGain();
-      track.gain.gain.value = 0;
-      track.gain.connect(musicGain);
+    if (!menuGain) {
+      menuGain = ctx.createGain();
+      menuGain.connect(musicGain);
     }
 
-    return track.gain;
+    if (!combatGain) {
+      combatGain = ctx.createGain();
+      combatGain.connect(musicGain);
+    }
+
+    return true;
   }
 
-  function startMusicSource(name, startAt) {
-    const track = music[name];
-    if (track.source) return true;
+  function startMusicSource(name) {
+    if (!ensureMusicGains()) return null;
 
-    const buffer = audioBuffers["music_" + name];
-    if (!buffer) return false;
+    const isMenu = name === "menu";
+    let source = isMenu ? menuSource : combatSource;
+    if (source) return source;
 
-    const gain = ensureMusicGain(name);
-    if (!gain) return false;
+    const bufferName = "music_" + name;
+    const buffer = audioBuffers[bufferName];
+    if (!buffer) return null;
 
-    const source = ctx.createBufferSource();
+    const gain = isMenu ? menuGain : combatGain;
+
+    source = ctx.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
     source.connect(gain);
 
-    try {
-      source.start(startAt);
-    } catch (e) {
-      return false;
+    const t = ctx.currentTime;
+
+    // Arranca en silencio para evitar click inicial.
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(0, t);
+
+    source.start(t);
+
+    if (isMenu) {
+      menuSource = source;
+    } else {
+      combatSource = source;
     }
 
-    track.source = source;
-    return true;
+    return source;
   }
 
-  function setTrackTarget(name, target, fade) {
-    if (!ctx || ctx.state !== "running") return;
+  function setMusicTarget(name, target, fade) {
+    if (!ctx || !contextRunning || ctx.state !== "running") return;
 
-    const track = music[name];
-    const gain = ensureMusicGain(name);
+    const bufferName = "music_" + name;
+    const clamped = clamp01(target);
+
+    if (clamped > 0.001 && !audioBuffers[bufferName]) {
+      console.warn("AudioFX: pista de música no disponible:", bufferName);
+      return;
+    }
+
+    if (!ensureMusicGains()) return;
+
+    const gain = name === "menu" ? menuGain : combatGain;
     if (!gain) return;
 
-    const now = ctx.currentTime;
-    const current = gain.gain.value;
-    const clamped = clamp01(target);
-    const duration = Math.max(0.05, Number(fade) || MUSIC_CROSSFADE);
-
     if (clamped > 0.001) {
-      if (!track.source) {
-        const startAt = now + START_LOOKAHEAD;
-
-        gain.cancelScheduledValues(now);
-        gain.setValueAtTime(0, now);
-
-        if (!startMusicSource(name, startAt)) {
-          return;
-        }
-
-        gain.setValueAtTime(0, startAt);
-        gain.linearRampToValueAtTime(clamped, startAt + duration);
-      } else {
-        gain.cancelScheduledValues(now);
-        gain.setValueAtTime(current, now);
-        gain.linearRampToValueAtTime(clamped, now + duration);
-      }
-    } else {
-      gain.cancelScheduledValues(now);
-      gain.setValueAtTime(current, now);
-      gain.linearRampToValueAtTime(0, now + duration);
+      startMusicSource(name);
     }
+
+    const t = ctx.currentTime;
+    const current = gain.gain.value;
+
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(current, t);
+    gain.gain.linearRampToValueAtTime(
+      clamped,
+      t + Math.max(0.05, Number(fade) || MUSIC_CROSSFADE)
+    );
   }
 
-  function applyIntensityIfPossible(explicitFade) {
-    if (!contextRunning || !ctx || ctx.state !== "running") return;
+  function applyIntensity(fade) {
+    if (!ctx || !contextRunning || ctx.state !== "running") return;
 
     const target = mix.intensity === "combat" ? "combat" : "menu";
     const other = target === "combat" ? "menu" : "combat";
 
-    // Regla clave: no bajar la pista actual si la destino no está lista.
-    if (!audioBuffers["music_" + target]) return;
-
-    const fade =
-      Number.isFinite(explicitFade) && explicitFade > 0
-        ? explicitFade
-        : (musicEverStarted ? MUSIC_CROSSFADE : MUSIC_START_FADE);
-
-    setTrackTarget(target, 1, fade);
-    setTrackTarget(other, 0, fade);
-
-    musicEverStarted = true;
-  }
-
-  function maybeScheduleSfxQueue() {
-    if (sfxQueueStarted) return;
-
-    const menuDone = !!audioBuffers.music_menu || !!failed.music_menu;
-    const combatDone = !!audioBuffers.music_combat || !!failed.music_combat;
-
-    if (menuDone && combatDone) {
-      sfxQueueStarted = true;
-      sfxIndex = 0;
-      scheduleNextSfx(0);
-    }
-  }
-
-  /* ==================== COLA SFX ==================== */
-
-  function scheduleNextSfx(delay) {
-    if (!contextRunning) return;
-
-    if (delay > 0) {
-      window.setTimeout(processNextSfx, delay);
-      return;
-    }
-
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(processNextSfx, { timeout: 1000 });
-    } else {
-      window.setTimeout(processNextSfx, SFX_DECODE_DELAY);
-    }
-  }
-
-  function processNextSfx() {
-    if (!contextRunning) return;
-    if (sfxIndex >= SFX_DECODE_ORDER.length) return;
-
-    const name = SFX_DECODE_ORDER[sfxIndex];
-
-    if (audioBuffers[name] || failed[name]) {
-      sfxIndex++;
-      scheduleNextSfx(SFX_DECODE_DELAY);
-      return;
-    }
-
-    if (decoding[name] || loading[name] || !loaded[name]) {
-      // Esperamos sin avanzar la cola para no perder ese SFX.
-      scheduleNextSfx(300);
-      return;
-    }
-
-    decodeName(name, () => {
-      sfxIndex++;
-      scheduleNextSfx(SFX_DECODE_DELAY);
-    });
+    setMusicTarget(target, 1, fade);
+    setMusicTarget(other, 0, fade);
   }
 
   /* ==================== SFX ==================== */
 
   function play(name) {
-    if (!ctx || ctx.state !== "running") return;
-    if (mix.muted) return;
-    if (document.hidden) return;
-    if (foreground < 0.01) return;
+    if (!ctx || ctx.state !== "running" || mix.muted) return;
 
     const buffer = audioBuffers[name];
-    if (!buffer) return;
+
+    if (!buffer) {
+      // Si ya está descargado pero aún no decodificado, intenta decodificar.
+      if (loaded[name] && !failed[name] && !decoding[name]) {
+        decodeName(name);
+      }
+      return;
+    }
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(sfxGain);
-    source.start(ctx.currentTime + SFX_LOOKAHEAD);
+    source.start(ctx.currentTime);
   }
 
   /* ==================== DESBLOQUEO POR GESTO ==================== */
-
-  function markContextRunning() {
-    if (contextRunning) return;
-
-    contextRunning = true;
-    removeUnlockListeners();
-
-    // Prioridad absoluta: música primero.
-    decodeName("music_menu", null);
-    decodeName("music_combat", null);
-
-    maybeScheduleSfxQueue();
-    applyIntensityIfPossible(MUSIC_START_FADE);
-  }
 
   function handleUnlockGesture() {
     createAudioContext();
@@ -496,35 +345,29 @@
       return;
     }
 
-    if (resumeInProgress) return;
-    resumeInProgress = true;
-
-    let promise = null;
+    let resumePromise = null;
 
     try {
-      promise = ctx.resume();
-    } catch (e) {
-      resumeInProgress = false;
-      return;
+      resumePromise = ctx.resume();
+    } catch (error) {
+      // Algunos navegadores pueden lanzar error si no hay activación válida.
     }
 
-    if (promise && typeof promise.then === "function") {
-      promise
+    if (resumePromise && typeof resumePromise.then === "function") {
+      resumePromise
         .then(() => {
-          resumeInProgress = false;
           if (ctx && ctx.state === "running") {
             markContextRunning();
           }
         })
         .catch(() => {
-          resumeInProgress = false;
           // No quitamos listeners: seguiremos reintentando en próximos gestos.
         });
-    } else {
-      resumeInProgress = false;
-      if (ctx.state === "running") {
-        markContextRunning();
-      }
+    }
+
+    // En algunos navegadores el estado cambia de forma síncrona.
+    if (ctx.state === "running") {
+      markContextRunning();
     }
   }
 
@@ -533,11 +376,11 @@
 
     unlockHandler = handleUnlockGesture;
 
-    const passive = { passive: true };
+    const passiveOptions = { passive: true };
 
-    window.addEventListener("pointerdown", unlockHandler, passive);
-    window.addEventListener("touchend", unlockHandler, passive);
-    window.addEventListener("click", unlockHandler, passive);
+    window.addEventListener("pointerdown", unlockHandler, passiveOptions);
+    window.addEventListener("touchend", unlockHandler, passiveOptions);
+    window.addEventListener("click", unlockHandler, passiveOptions);
     window.addEventListener("keydown", unlockHandler);
 
     unlockListenersBound = true;
@@ -559,106 +402,13 @@
     unlockHandler = null;
   }
 
-  /* ==================== VISIBILIDAD / SEGUNDO PLANO ==================== */
-
-  function suspendContextIfStillHidden() {
-    hiddenTimeout = null;
-
-    if (!ctx) return;
-    if (!document.hidden) return;
-    if (ctx.state !== "running") return;
-
-    try {
-      ctx.suspend();
-    } catch (e) {
-      // Silencioso.
-    }
-  }
-
-  function onVisibilityChange() {
-    if (!ctx) return;
-
-    if (document.hidden) {
-      if (hiddenTimeout) {
-        window.clearTimeout(hiddenTimeout);
-        hiddenTimeout = null;
-      }
-
-      foreground = 0;
-      applyMixValues(VISIBILITY_FADE_OUT);
-
-      hiddenTimeout = window.setTimeout(
-        suspendContextIfStillHidden,
-        HIDDEN_SUSPEND_DELAY
-      );
-
-      return;
-    }
-
-    if (hiddenTimeout) {
-      window.clearTimeout(hiddenTimeout);
-      hiddenTimeout = null;
-    }
-
-    const restore = () => {
-      foreground = 1;
-      applyMixValues(VISIBILITY_FADE_IN);
-      applyIntensityIfPossible(0.25);
-    };
-
-    if (!contextRunning && ctx.state === "running") {
-      markContextRunning();
-    }
-
-    if (ctx.state === "suspended") {
-      let promise = null;
-
-      try {
-        promise = ctx.resume();
-      } catch (e) {
-        promise = null;
-      }
-
-      if (promise && typeof promise.then === "function") {
-        promise
-          .then(() => {
-            if (ctx && ctx.state === "running") {
-              if (!contextRunning) markContextRunning();
-              restore();
-            } else {
-              bindUnlockListeners();
-            }
-          })
-          .catch(() => {
-            bindUnlockListeners();
-          });
-      } else if (ctx.state === "running") {
-        if (!contextRunning) markContextRunning();
-        restore();
-      } else {
-        bindUnlockListeners();
-      }
-    } else if (ctx.state === "running") {
-      if (!contextRunning) markContextRunning();
-      restore();
-    } else {
-      bindUnlockListeners();
-    }
-  }
-
-  function bindVisibility() {
-    if (visibilityBound) return;
-    visibilityBound = true;
-    document.addEventListener("visibilitychange", onVisibilityChange);
-  }
-
   /* ==================== API PÚBLICA ==================== */
 
   function setIntensity(mode) {
     mix.intensity = mode === "combat" ? "combat" : "menu";
 
     if (contextRunning && ctx && ctx.state === "running") {
-      applyIntensityIfPossible(MUSIC_CROSSFADE);
+      applyIntensity(MUSIC_CROSSFADE);
     }
   }
 
@@ -681,55 +431,86 @@
 
     if (!ctx) return;
 
-    applyMixValues(0.05);
+    applyMixValues();
 
-    // Solo reanima si el contexto ya existe. No crea contexto desde el slider.
-    if (ctx.state === "suspended" && !mix.muted && !document.hidden) {
-      let promise = null;
+    if (ctx.state === "suspended" && !mix.muted) {
+      let resumePromise = null;
 
       try {
-        promise = ctx.resume();
-      } catch (e) {
-        promise = null;
+        resumePromise = ctx.resume();
+      } catch (error) {
+        // Silencioso.
       }
 
-      if (promise && typeof promise.then === "function") {
-        promise
+      if (resumePromise && typeof resumePromise.then === "function") {
+        resumePromise
           .then(() => {
             if (ctx && ctx.state === "running") {
-              if (!contextRunning) {
-                markContextRunning();
-              } else {
-                foreground = 1;
-                applyMixValues(VISIBILITY_FADE_IN);
-                applyIntensityIfPossible(0.25);
-              }
+              markContextRunning();
             }
           })
           .catch(() => {
-            // Silencioso. Los listeners de gesto seguirán si aún no hay contexto running.
+            bindUnlockListeners();
           });
       } else if (ctx.state === "running") {
-        if (!contextRunning) {
-          markContextRunning();
-        } else {
-          foreground = 1;
-          applyMixValues(VISIBILITY_FADE_IN);
-          applyIntensityIfPossible(0.25);
-        }
+        markContextRunning();
       }
+    } else if (ctx.state === "running" && !contextRunning) {
+      markContextRunning();
     }
   }
 
   function init() {
-    if (!supportedAudioContext()) return;
-
-    // IMPORTANTE: aquí NO creamos AudioContext.
+    // IMPORTANTE: no creamos AudioContext aquí.
     bindUnlockListeners();
-    bindVisibility();
 
-    // Precargamos bytes crudos. Esto no requiere AudioContext y no bloquea UI.
-    ALL_FETCH_NAMES.forEach(fetchRaw);
+    // Precargamos los MP3 como ArrayBuffer. Esto no requiere AudioContext.
+    ALL_NAMES.forEach(fetchRaw);
+
+    if (!visibilityBound) {
+      visibilityBound = true;
+
+      document.addEventListener("visibilitychange", () => {
+        if (!ctx) return;
+
+        if (document.hidden) {
+          try {
+            ctx.suspend();
+          } catch (error) {
+            // Silencioso.
+          }
+          return;
+        }
+
+        if (mix.muted) return;
+
+        let resumePromise = null;
+
+        try {
+          resumePromise = ctx.resume();
+        } catch (error) {
+          // Silencioso.
+        }
+
+        if (resumePromise && typeof resumePromise.then === "function") {
+          resumePromise
+            .then(() => {
+              if (ctx && ctx.state === "running") {
+                markContextRunning();
+              } else {
+                bindUnlockListeners();
+              }
+            })
+            .catch(() => {
+              bindUnlockListeners();
+            });
+        } else if (ctx.state === "running") {
+          markContextRunning();
+        } else {
+          bindUnlockListeners();
+        }
+      });
+    }
   }
 
   window.AudioFX = {
