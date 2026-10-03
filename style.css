@@ -4,6 +4,14 @@
    + botón de inspección "ojo arcano" (abajo-izquierda)
    + ocultar × cerrar inspección en móvil
    + carta de inspección VERTICAL con zona de arte (Bug 3)
+   + Intenciones enemigas (B2)
+   + Resumen mecánico y keywords (C)
+   + Scrollbars coherentes (Fix gráfico)
+   + Ocultar × Grimorio/Cenizas en móvil (Fix gráfico)
+   + M1-HUB: MENÚ PRINCIPAL INTERACTIVO (Split Screen PC / Stack Móvil)
+   + M1-HUB fix: pantalla completa + transición esfera
+   + M1-HUB logo: degradado oro→violeta con glow
+   + FIX MÓVIL: quitar resaltado azul nativo al tocar botones
    Móvil vertical + PC horizontal
    ========================================================================== */
 
@@ -517,7 +525,7 @@ h3,
   min-height: clamp(8.2rem, 27vh, 13.25rem);
   padding: clamp(0.45rem, 1.2vw, 0.65rem);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: clamp(0.25rem, 0.8vw, 0.38rem);
   border: 1px solid rgba(251, 191, 36, 0.28);
   border-radius: var(--radius-md);
@@ -531,9 +539,6 @@ h3,
   color: var(--text);
   cursor: pointer;
   overflow: hidden;
-  /* Apaga el resaltado AZUL nativo que Chrome/Android pinta al tocar una carta.
-     Ese azul NO es tu borde dorado de foco: es un adorno del navegador.
-     NO rompe la accesibilidad: tu :focus-visible dorado es otra propiedad. */
   -webkit-tap-highlight-color: transparent;
   transition:
     transform 140ms ease,
@@ -860,6 +865,19 @@ h3,
 }
 
 /* ==========================================================================
+   FIX MÓVIL: quitar el resaltado azul nativo al tocar botones (Chrome/Android)
+   No rompe accesibilidad: el foco visible (:focus-visible dorado) es otra propiedad.
+   Las cartas (.page-card) y el ojo (.card-inspect-btn) ya lo traían inline.
+   ========================================================================== */
+
+.ritual-button,
+.text-link-btn,
+.deck-counter,
+.icon-button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ==========================================================================
    OVERLAYS
    ========================================================================== */
 
@@ -937,32 +955,27 @@ h3,
 
 .inspect-overlay {
   z-index: 60;
-  /* El overlay es quien scrollea si la carta fuera altísima; la carta NO tiene
-     scroll interno. Con margin:auto en la carta evitamos cortar el borde superior. */
   overflow: auto;
 }
 
 .page-card-large {
   position: relative;
-  margin: auto;                 /* centra y permite scroll sin cortar arriba */
+  margin: auto;
   width: min(86vw, 20rem);
   min-height: auto;
-  max-height: none;             /* crece con su contenido, sin recorte interno */
-  padding: 0;                   /* el padding lo ponen page-art y page-body */
+  max-height: none;
+  padding: 0;
   gap: 0;
   display: flex;
-  flex-direction: column;       /* vertical, tipo carta en pie */
+  flex-direction: column;
   cursor: default;
-  overflow: hidden;             /* esquinas redondeadas; sin scrollbar dentro */
+  overflow: hidden;
 }
 
-/* Quitamos el marco interior decorativo en la carta grande: cruzaría el arte. */
 .page-card-large::before {
   display: none;
 }
 
-/* Zona de arte: la estrella arcana de marca (violeta, independiente del tipo).
-   Mañana se sustituye el glyph por una <img> sin tocar el layout. */
 .page-art {
   position: relative;
   flex: 0 0 auto;
@@ -989,7 +1002,6 @@ h3,
   animation: artPulse 3.4s ease-in-out infinite;
 }
 
-/* Zona de texto: coste, nombre, tipo, descripción, con aire y sin recorte. */
 .page-body {
   flex: 1 1 auto;
   display: flex;
@@ -1315,10 +1327,11 @@ h3,
     width: min(92vw, 20rem);
   }
 
-  /* Ocultar la × de cerrar inspección en móvil:
-     en vertical el overlay ocupa toda la pantalla y el botón arriba-derecha
-     queda lejos del dedo o tapado por el notch. Se cierra tocando fuera o Escape. */
   #close-inspect {
+    display: none;
+  }
+
+  #close-deck {
     display: none;
   }
 }
@@ -1510,8 +1523,6 @@ h3,
   }
 }
 
-/* Respiración sutil de la estrella en la carta de inspección (sin translate,
-   para que quede quieta y centrada dentro del arte). */
 @keyframes artPulse {
   0%,
   100% {
@@ -1646,11 +1657,11 @@ h3,
   border-color: rgba(168, 85, 247, 0.5);
   box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
 }
+
 /* ==========================================================================
    AUTOGUARDADO (A.2): toast de confirmación + overlay "¿Continuar?"
    ========================================================================== */
 
-/* Toast discreto "Progreso guardado", abajo-derecha, tono pergamino + borde oro. */
 .save-toast {
   position: fixed;
   right: calc(var(--safe-right) + 0.85rem);
@@ -1679,7 +1690,6 @@ h3,
   transform: translateY(0);
 }
 
-/* Overlay "¿Continuar?": hereda .overlay/.overlay-card, solo eleva z y ordena botones. */
 .continue-overlay {
   z-index: 70;
 }
@@ -1698,6 +1708,41 @@ h3,
 .continue-actions .ritual-button {
   width: 100%;
 }
+
+/* ==========================================================================
+   SCROLLBAR COHERENTE CON EL GRIMORIO (overlay Grimorio/Cenizas)
+   ========================================================================== */
+
+.deck-list::-webkit-scrollbar {
+  width: 0.5rem;
+}
+
+.deck-list::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.4);
+  border-radius: 999px;
+}
+
+.deck-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--gold-soft), rgba(168, 85, 247, 0.6));
+  border-radius: 999px;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.deck-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--gold), var(--purple-light));
+}
+
+.deck-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-soft) rgba(2, 6, 23, 0.4);
+}
+
+@media (orientation: portrait) {
+  .deck-list {
+    padding-right: 0.75rem;
+  }
+}
+
 /* ==========================================================================
    B2: INTENCIÓN ENEMIGA (glifo arcano + número + etiqueta, teñido por tipo)
    ========================================================================== */
@@ -1750,7 +1795,6 @@ h3,
   text-overflow: ellipsis;
 }
 
-/* Ataque: rojo sangre */
 .intent-attack {
   border-color: rgba(239, 68, 68, 0.5);
   color: var(--blood);
@@ -1758,9 +1802,11 @@ h3,
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 0 14px var(--blood-glow);
 }
-.intent-attack .intent-value { color: var(--blood); }
 
-/* Bloqueo: azul escudo */
+.intent-attack .intent-value {
+  color: var(--blood);
+}
+
 .intent-block {
   border-color: rgba(56, 189, 248, 0.5);
   color: var(--shield);
@@ -1768,9 +1814,11 @@ h3,
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 0 14px rgba(56, 189, 248, 0.18);
 }
-.intent-block .intent-value { color: var(--shield); }
 
-/* Quemadura: naranja llama (mismo tono que .float-text.burn, sin inventar token) */
+.intent-block .intent-value {
+  color: var(--shield);
+}
+
 .intent-burn {
   border-color: rgba(251, 146, 60, 0.5);
   color: #fb923c;
@@ -1778,9 +1826,11 @@ h3,
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 0 14px rgba(251, 146, 60, 0.2);
 }
-.intent-burn .intent-value { color: #fb923c; }
 
-/* Efectos ACTUALES del enemigo (bloqueo que ya tiene / quemadura que le metiste) */
+.intent-burn .intent-value {
+  color: #fb923c;
+}
+
 .enemy-current-effects {
   flex: 1 0 100%;
   display: flex;
@@ -1789,51 +1839,447 @@ h3,
   justify-content: flex-end;
   margin-top: 0.15rem;
 }
+
 /* ==========================================================================
-   SCROLLBAR COHERENTE CON EL GRIMORIO (overlay Grimorio/Cenizas)
+   C: RESUMEN MECÁNICO + KEYWORDS EN CARTAS Y LISTADOS
    ========================================================================== */
 
-/* Estilizar la barra de scroll dentro del listado de cartas */
-.deck-list::-webkit-scrollbar {
-  width: 0.5rem;
+.page-mech {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
 }
 
-.deck-list::-webkit-scrollbar-track {
-  background: rgba(2, 6, 23, 0.4);
+.page-effects {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.effect-line {
+  font-family: var(--font-ui);
+  font-size: clamp(0.52rem, 1.5vw, 0.68rem);
+  line-height: 1.15;
+  color: var(--parchment-dim);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.keyword-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.32rem;
+  border: 1px solid rgba(251, 191, 36, 0.34);
   border-radius: 999px;
+  background: rgba(2, 6, 23, 0.6);
+  color: var(--gold-soft);
+  font-family: var(--font-strong);
+  font-size: clamp(0.44rem, 1.25vw, 0.56rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.2;
 }
 
-.deck-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--gold-soft), rgba(168, 85, 247, 0.6));
+.page-card-large .effect-line {
+  font-size: clamp(0.7rem, 2vw, 0.86rem);
+  white-space: normal;
+}
+
+.page-card-large .keyword-badge {
+  font-size: clamp(0.56rem, 1.6vw, 0.68rem);
+}
+
+.deck-item-mech {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  margin-top: 0.1rem;
+}
+
+.deck-item-effects {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.4rem;
+}
+
+.deck-item-effects li {
+  font-family: var(--font-ui);
+  font-size: clamp(0.5rem, 1.4vw, 0.62rem);
+  color: var(--parchment-dim);
+}
+
+.deck-item-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.deck-keyword-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.04rem 0.3rem;
+  border: 1px solid rgba(251, 191, 36, 0.30);
   border-radius: 999px;
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+  background: rgba(2, 6, 23, 0.55);
+  color: var(--gold-soft);
+  font-family: var(--font-strong);
+  font-size: clamp(0.42rem, 1.2vw, 0.52rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.deck-list::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--gold), var(--purple-light));
+/* ==========================================================================
+   M1: MENÚ PRINCIPAL — fila de botones secundarios (LEGACY)
+   ========================================================================== */
+
+.menu-secondary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: center;
+  margin-top: 0.3rem;
 }
 
-/* Firefox: misma coherencia visual */
-.deck-list {
-  scrollbar-width: thin;
-  scrollbar-color: var(--gold-soft) rgba(2, 6, 23, 0.4);
+.menu-secondary-row .ritual-button {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: clamp(0.68rem, 2vw, 0.88rem);
+  padding: 0.45rem 0.7rem;
 }
 
-/* Móvil: reservar margen derecho para que la barra NO tape los nombres */
-@media (orientation: portrait) {
-  .deck-list {
-    padding-right: 0.75rem; /* espacio extra = ancho de la barra + aire */
+.subscreen-placeholder {
+  font-family: var(--font-ui);
+  font-size: clamp(0.78rem, 2.2vw, 0.95rem);
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+}
+
+/* ==========================================================================
+   M1-HUB: MENÚ PRINCIPAL INTERACTIVO (Split Screen PC / Stack Móvil)
+   ========================================================================== */
+
+.menu-hub {
+  display: grid;
+  grid-template-columns: minmax(280px, 40%) 1fr;
+  grid-template-rows: 1fr;
+  align-items: stretch;
+  align-content: stretch;
+  justify-items: stretch;
+  gap: 0;
+  padding: 0 !important;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-deep);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.menu-nav-panel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(2rem, 5vw, 4rem);
+  background:
+    linear-gradient(to right, rgba(2, 6, 23, 0.98), rgba(2, 6, 23, 0.85)),
+    radial-gradient(circle at 0% 50%, rgba(168, 85, 247, 0.1), transparent 70%);
+  border-right: 1px solid var(--gold-border);
+  box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Logo con degradado oro→violeta (Ruta 1 / sección 3 de los tokens).
+   Fallback sólido dorado si el navegador no soporta recorte de texto. */
+.menu-logo {
+  margin-bottom: clamp(2rem, 4vh, 3rem);
+  font-family: var(--font-title);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--gold-soft);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .menu-logo {
+    background: linear-gradient(180deg, #fbbf24 0%, #c084fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter:
+      drop-shadow(0 0 12px rgba(168, 85, 247, 0.35))
+      drop-shadow(0 0 22px rgba(251, 191, 36, 0.18));
   }
 }
-/* ==========================================================================
-   OCULTAR LA × DE CERRAR EN GRIMORIO/CENIZAS (móvil vertical)
-   En portrait el botón arriba-derecha queda lejos del dedo o tapado por el notch.
-   Ya existe el botón "Cerrar" abajo (#deck-close-bottom), así que la × es redundante.
-   En PC sí se mantiene visible (ratón + ventana grande).
-   ========================================================================== */
+
+.menu-actions {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.primary-menu-btn {
+  width: 100%;
+  min-height: 3.5rem;
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
+  border-color: var(--gold);
+  box-shadow:
+    0 0 20px rgba(251, 191, 36, 0.15),
+    inset 0 0 10px rgba(251, 191, 36, 0.05);
+}
+
+.secondary-menu-btn {
+  width: 100%;
+  opacity: 0.9;
+}
+
+.menu-divider {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--gold-border), transparent);
+  margin: 0.5rem 0;
+}
+
+.menu-secondary-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: flex-start;
+}
+
+.text-link-btn {
+  background: none;
+  border: none;
+  color: var(--parchment-dim);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  transition: color 140ms ease, text-decoration 140ms ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@media (hover: hover) {
+  .text-link-btn:hover {
+    color: var(--gold);
+    text-decoration: underline;
+  }
+}
+
+.text-link-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.menu-footer {
+  margin-top: auto;
+  padding-top: 2rem;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-family: var(--font-ui);
+}
+
+.menu-artifact-stage {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(88, 28, 135, 0.25), transparent 60%),
+    linear-gradient(180deg, #05070f, #0f172a);
+  display: grid;
+  place-items: center;
+}
+
+.particle-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.arcane-orb-wrapper {
+  position: relative;
+  width: min(60vh, 400px);
+  aspect-ratio: 1;
+  z-index: 2;
+  will-change: transform;
+}
+
+.orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px dashed rgba(251, 191, 36, 0.3);
+  animation: orbSpinSlow 40s linear infinite;
+}
+
+.inner-ring {
+  inset: 15%;
+  border-style: dotted;
+  border-color: rgba(168, 85, 247, 0.4);
+  animation: orbSpinReverse 30s linear infinite;
+}
+
+@keyframes orbSpinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbSpinReverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.orb-core {
+  position: absolute;
+  inset: 25%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4), transparent 70%);
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 0 40px rgba(168, 85, 247, 0.3),
+    inset 0 0 20px rgba(96, 165, 250, 0.2);
+}
+
+.star-glyph {
+  font-size: clamp(4rem, 15vw, 8rem);
+  color: var(--purple-light);
+  text-shadow:
+    0 0 20px var(--purple),
+    0 0 40px var(--ink),
+    0 0 60px rgba(255, 255, 255, 0.1);
+  animation: starPulse 3s ease-in-out infinite;
+  user-select: none;
+}
+
+@keyframes starPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+    filter: brightness(1.2);
+  }
+}
 
 @media (orientation: portrait) {
-  #close-deck {
-    display: none;
+  .menu-hub {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .menu-nav-panel {
+    border-right: none;
+    border-bottom: 1px solid var(--gold-border);
+    padding: 2rem 1.5rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  .menu-actions {
+    max-width: 100%;
+    align-items: center;
+  }
+
+  .primary-menu-btn,
+  .secondary-menu-btn {
+    width: 100%;
+  }
+
+  .menu-secondary-group {
+    justify-content: center;
+  }
+
+  .menu-artifact-stage {
+    min-height: 40vh;
+  }
+
+  .arcane-orb-wrapper {
+    width: min(80vw, 300px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb-ring,
+  .inner-ring,
+  .star-glyph {
+    animation: none !important;
+  }
+
+  .arcane-orb-wrapper {
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   M1-HUB fix: transición de entrada/salida del menú
+   ========================================================================== */
+
+@keyframes hubEnter {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hubLeave {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+.menu-hub--entering {
+  animation: hubEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.menu-hub--leaving {
+  animation: hubLeave 420ms cubic-bezier(0.55, 0, 0.55, 0.2) both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-hub--entering,
+  .menu-hub--leaving {
+    animation: none !important;
   }
 }
