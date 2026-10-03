@@ -6,6 +6,16 @@
     battlefield: document.getElementById("battlefield"),
     intro: document.getElementById("intro-screen"),
     start: document.getElementById("start-game"),
+    continueGame: document.getElementById("continue-game"),
+    openHistory: document.getElementById("open-history"),
+    openSettings: document.getElementById("open-settings"),
+    openLore: document.getElementById("open-lore"),
+    historyScreen: document.getElementById("history-screen"),
+    settingsScreen: document.getElementById("settings-screen"),
+    loreScreen: document.getElementById("lore-screen"),
+    closeHistory: document.getElementById("close-history"),
+    closeSettings: document.getElementById("close-settings"),
+    closeLore: document.getElementById("close-lore"),
     result: document.getElementById("result-screen"),
     resultTitle: document.getElementById("result-title"),
     resultText: document.getElementById("result-text"),
@@ -42,6 +52,7 @@
 
   let state = null;
   let started = false;
+  let currentScreen = "menu"; // "menu" | "combat"
   let longPressTimer = null;
   let activeCardElement = null;
   let pressStartedAt = 0;
@@ -52,93 +63,55 @@
   const LONG_PRESS_MS = 500;
   const MOVE_THRESHOLD = 10;
 
-  // Autoguardado (A.2): slot único, versionado por logic.js.
   const SAVE_KEY = "grimoire-save";
+  const FIRST_TIME_KEY = "grimoire-first-time";
   let pendingLoadedState = null;
   let saveToastEl = null;
   let saveToastTimer = null;
 
-  /* ==========================================================================
-     EFECTO AMBIENTAL: MIRADA ARCANA
-     ========================================================================== */
-
+  /* ==================== EFECTO AMBIENTAL: MIRADA ARCANA ==================== */
   const prefersReducedMotion =
-    window.matchMedia &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const look = {
-    enabled: !prefersReducedMotion,
-    sensorActive: false,
-    neutralBeta: null,
-    neutralGamma: null,
-    maxMove: 10,
-    runeRatio: 0.55,
-    ease: 0.08,
-    targetX: 0,
-    targetY: 0,
-    currentX: 0,
-    currentY: 0,
-    targetRuneX: 0,
-    targetRuneY: 0,
-    currentRuneX: 0,
-    currentRuneY: 0,
-    rafId: null
+    enabled: !prefersReducedMotion, sensorActive: false,
+    neutralBeta: null, neutralGamma: null,
+    maxMove: 10, runeRatio: 0.55, ease: 0.08,
+    targetX: 0, targetY: 0, currentX: 0, currentY: 0,
+    targetRuneX: 0, targetRuneY: 0, currentRuneX: 0, currentRuneY: 0, rafId: null
   };
 
-  function clampValue(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
-
-  function setLookTargets(normalizedX, normalizedY) {
+  function clampValue(v, min, max) { return Math.min(max, Math.max(min, v)); }
+  function setLookTargets(nx, ny) {
     if (!look.enabled) return;
-    const x = clampValue(normalizedX, -1, 1);
-    const y = clampValue(normalizedY, -1, 1);
-    look.targetX = x * look.maxMove;
-    look.targetY = y * look.maxMove;
-    look.targetRuneX = look.targetX * look.runeRatio;
-    look.targetRuneY = look.targetY * look.runeRatio;
+    const x = clampValue(nx, -1, 1), y = clampValue(ny, -1, 1);
+    look.targetX = x * look.maxMove; look.targetY = y * look.maxMove;
+    look.targetRuneX = look.targetX * look.runeRatio; look.targetRuneY = look.targetY * look.runeRatio;
   }
-
   function resetSensorNeutral() {
-    look.neutralBeta = null;
-    look.neutralGamma = null;
-    look.targetX = 0;
-    look.targetY = 0;
-    look.targetRuneX = 0;
-    look.targetRuneY = 0;
+    look.neutralBeta = null; look.neutralGamma = null;
+    look.targetX = 0; look.targetY = 0; look.targetRuneX = 0; look.targetRuneY = 0;
   }
-
   function onDeviceOrientation(event) {
     if (!look.enabled) return;
-    const hasBeta = typeof event.beta === "number" && Number.isFinite(event.beta);
-    const hasGamma = typeof event.gamma === "number" && Number.isFinite(event.gamma);
-    if (!hasBeta || !hasGamma) return;
-
+    const hasB = typeof event.beta === "number" && Number.isFinite(event.beta);
+    const hasG = typeof event.gamma === "number" && Number.isFinite(event.gamma);
+    if (!hasB || !hasG) return;
     look.sensorActive = true;
-
     if (look.neutralBeta === null || look.neutralGamma === null) {
-      look.neutralBeta = event.beta;
-      look.neutralGamma = event.gamma;
-      return;
+      look.neutralBeta = event.beta; look.neutralGamma = event.gamma; return;
     }
-
-    const deltaGamma = event.gamma - look.neutralGamma;
-    const deltaBeta = event.beta - look.neutralBeta;
     const range = 30;
-    const nx = clampValue(deltaGamma / range, -1, 1);
-    const ny = clampValue(deltaBeta / range, -1, 1);
-    setLookTargets(nx, ny);
+    setLookTargets(
+      clampValue((event.gamma - look.neutralGamma) / range, -1, 1),
+      clampValue((event.beta - look.neutralBeta) / range, -1, 1)
+    );
   }
-
   function onPointerMove(event) {
     if (!look.enabled || look.sensorActive) return;
-    const width = window.innerWidth || 1;
-    const height = window.innerHeight || 1;
-    const nx = (event.clientX / width - 0.5) * 2;
-    const ny = (event.clientY / height - 0.5) * 2;
-    setLookTargets(nx, ny);
+    const w = window.innerWidth || 1, h = window.innerHeight || 1;
+    setLookTargets((event.clientX / w - 0.5) * 2, (event.clientY / h - 0.5) * 2);
   }
-
   function applyLookVariables() {
     if (!look.enabled) return;
     const root = document.documentElement;
@@ -147,7 +120,6 @@
     root.style.setProperty("--rune-x", `${look.currentRuneX.toFixed(2)}px`);
     root.style.setProperty("--rune-y", `${look.currentRuneY.toFixed(2)}px`);
   }
-
   function lookLoop() {
     if (!look.enabled) return;
     look.currentX += (look.targetX - look.currentX) * look.ease;
@@ -157,7 +129,6 @@
     applyLookVariables();
     look.rafId = window.requestAnimationFrame(lookLoop);
   }
-
   function initLookEffects() {
     if (!look.enabled) return;
     window.addEventListener("deviceorientation", onDeviceOrientation, { passive: true });
@@ -165,65 +136,26 @@
     look.rafId = window.requestAnimationFrame(lookLoop);
   }
 
-  /* ==========================================================================
-     UTILIDADES BÁSICAS
-     ========================================================================== */
-
+  /* ==================== UTILIDADES ==================== */
   function createGameState() {
-    if (typeof GameState === "undefined") {
-      throw new Error("GameState no está definido. Revisa src/logic.js.");
-    }
-    if (typeof GameState === "function") {
-      return new GameState();
-    }
-    if (GameState && typeof GameState === "object") {
-      return GameState;
-    }
+    if (typeof GameState === "undefined") throw new Error("GameState no está definido. Revisa src/logic.js.");
+    if (typeof GameState === "function") return new GameState();
+    if (GameState && typeof GameState === "object") return GameState;
     throw new Error("GameState no tiene una forma válida.");
   }
-
-  function num(value, fallback = 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? " ").replace(/[&<>"']/g, (char) => {
-      switch (char) {
-        case "&": return "&amp;";
-        case "<": return "&lt;";
-        case ">": return "&gt;";
-        case '"': return "&quot;";
-        case "'": return "&#39;";
-        default: return char;
-      }
+  function num(v, fb = 0) { const p = Number(v); return Number.isFinite(p) ? p : fb; }
+  function escapeHtml(v) {
+    return String(v ?? " ").replace(/[&<>"']/g, (c) => {
+      switch (c) { case "&": return "&amp;"; case "<": return "&lt;"; case ">": return "&gt;"; case '"': return "&quot;"; case "'": return "&#39;"; default: return c; }
     });
   }
-
-  function setMessage(text) {
-    if (els.message) {
-      els.message.textContent = text;
-    }
+  function setMessage(t) { if (els.message) els.message.textContent = t; }
+  function shake(el) {
+    if (!el || typeof el.animate !== "function") return;
+    el.animate([{transform:"translateX(0)"},{transform:"translateX(-5px)"},{transform:"translateX(5px)"},{transform:"translateX(-3px)"},{transform:"translateX(0)"}],{duration:180,easing:"ease-in-out"});
   }
 
-  function shake(element) {
-    if (!element || typeof element.animate !== "function") return;
-    element.animate(
-      [
-        { transform: "translateX(0)" },
-        { transform: "translateX(-5px)" },
-        { transform: "translateX(5px)" },
-        { transform: "translateX(-3px)" },
-        { transform: "translateX(0)" }
-      ],
-      { duration: 180, easing: "ease-in-out" }
-    );
-  }
-
-  /* ==========================================================================
-     LECTURA SEGURA DEL ESTADO
-     ========================================================================== */
-
+  /* ==================== LECTURA SEGURA DEL ESTADO ==================== */
   function getEnergy() { return num(state?.energy); }
   function getMaxEnergy() { return num(state?.maxEnergy, getEnergy()); }
   function getPlayerHp() { return num(state?.playerHp); }
@@ -233,830 +165,566 @@
   function getBlock() { return num(state?.block ?? state?.playerBlock ?? state?.shield); }
   function getBurn() { return num(state?.burn ?? state?.playerBurn); }
   function getEnemyBlock() { return num(state?.enemy?.block ?? state?.enemyBlock); }
-  // A2: la lógica guarda la quemadura enemiga en enemyBurnStacks.
   function getEnemyBurn() { return num(state?.enemy?.burn ?? state?.enemyBurn ?? state?.enemyBurnStacks); }
   function cardCost(card) { return num(card?.cost); }
   function canPlayCard(card) { return cardCost(card) <= getEnergy(); }
 
-  // B2: intención futura del enemigo (la dejó B1 en state.enemy.intent).
   function getEnemyIntent() {
     const intent = state?.enemy?.intent;
     if (!intent || typeof intent !== "object") return null;
     const kind = String(intent.kind || "").toLowerCase();
     if (kind !== "attack" && kind !== "block" && kind !== "burn") return null;
-    return {
-      kind,
-      value: num(intent.value),
-      label: intent.label || (kind === "attack" ? "Ataque" : kind === "block" ? "Bloqueo" : "Quemadura")
-    };
+    return { kind, value: num(intent.value), label: intent.label || (kind === "attack" ? "Ataque" : kind === "block" ? "Bloqueo" : "Quemadura") };
   }
 
+  function hasEffect(card, type) { return Array.isArray(card?.effects) && card.effects.some((e) => e.type === type); }
+  function effectLabel(e) {
+    switch (e.type) {
+      case "damage": return e.hits > 1 ? `Daño ${e.value} ×${e.hits}` : `Daño ${e.value}`;
+      case "self_damage": return `Auto-daño ${e.value}`;
+      case "block": return `Bloqueo ${e.value}`;
+      case "heal": return `Curación ${e.value}`;
+      case "burn_enemy": return `Quema ${e.value}`;
+      case "burn_player": return `Te quema ${e.value}`;
+      case "draw": return `Roba ${e.value}`;
+      case "energy": return e.value >= 0 ? `Tinta +${e.value}` : `Tinta ${e.value}`;
+      default: return "";
+    }
+  }
+  function describeEffects(card) { return (Array.isArray(card?.effects) ? card.effects : []).map(effectLabel).filter(Boolean); }
+  function describeKeywords(card) { const k = []; if (card?.exhaust) k.push("Se agota"); if (card?.retain) k.push("Permanece"); if (card?.innate) k.push("Innata"); return k; }
+
   function typeLabel(card) {
+    if (card?.curse) return "Maldición";
+    if (card?.corrupted) return "Corrupción";
     const type = String(card?.type || "").toLowerCase();
     if (type === "attack") return "Ataque";
     if (type === "power") return "Poder";
     if (type === "skill") {
-      return card?.heal ? "Curación" : "Defensa";
+      if (hasEffect(card, "heal") && !hasEffect(card, "block")) return "Curación";
+      if (hasEffect(card, "block")) return "Defensa";
+      return "Truco";
     }
-    if (card?.heal) return "Curación";
-    if (card?.curse) return "Maldición";
-    if (card?.corrupted) return "Corrupción";
     return "Página";
   }
 
-  /* ==========================================================================
-     LECTURA SEGURA DE MAZO / DESCARTE
-     ========================================================================== */
+  /* ==================== MAZO / DESCARTE ==================== */
+  function firstArray(...vals) { for (const v of vals) if (Array.isArray(v)) return v; return null; }
+  function firstNumber(...vals) { for (const v of vals) { if (v == null) continue; const p = Number(v); if (Number.isFinite(p)) return p; } return null; }
+  function getDrawPileArray() { return firstArray(state?.drawPile, state?.deck, state?.library, state?.grimoire, state?.remainingCards, state?.drawCards) || []; }
+  function getDrawCount() { const a = firstArray(state?.drawPile, state?.deck, state?.library, state?.grimoire, state?.remainingCards, state?.drawCards); if (a) return a.length; return num(firstNumber(state?.drawCount, state?.deckCount, state?.remainingCount, state?.grimoireCount, state?.libraryCount), 0); }
+  function getDiscardPileArray() { return firstArray(state?.discardPile, state?.discard, state?.ashes, state?.cenizas, state?.discardedCards) || []; }
+  function getDiscardCount() { const a = firstArray(state?.discardPile, state?.discard, state?.ashes, state?.cenizas, state?.discardedCards); if (a) return a.length; return num(firstNumber(state?.discardCount, state?.ashesCount, state?.cenizasCount, state?.discardedCount), 0); }
 
-  function firstArray(...values) {
-    for (const value of values) {
-      if (Array.isArray(value)) return value;
-    }
-    return null;
-  }
-
-  function firstNumber(...values) {
-    for (const value of values) {
-      if (value === null || value === undefined) continue;
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-    return null;
-  }
-
-  function getDrawPileArray() {
-    return firstArray(
-      state?.drawPile, state?.deck, state?.library,
-      state?.grimoire, state?.remainingCards, state?.drawCards
-    ) || [];
-  }
-
-  function getDrawCount() {
-    const arr = firstArray(
-      state?.drawPile, state?.deck, state?.library,
-      state?.grimoire, state?.remainingCards, state?.drawCards
-    );
-    if (arr) return arr.length;
-    const n = firstNumber(
-      state?.drawCount, state?.deckCount, state?.remainingCount,
-      state?.grimoireCount, state?.libraryCount
-    );
-    return num(n, 0);
-  }
-
-  function getDiscardPileArray() {
-    return firstArray(
-      state?.discardPile, state?.discard, state?.ashes,
-      state?.cenizas, state?.discardedCards
-    ) || [];
-  }
-
-  function getDiscardCount() {
-    const arr = firstArray(
-      state?.discardPile, state?.discard, state?.ashes,
-      state?.cenizas, state?.discardedCards
-    );
-    if (arr) return arr.length;
-    const n = firstNumber(
-      state?.discardCount, state?.ashesCount, state?.cenizasCount, state?.discardedCount
-    );
-    return num(n, 0);
-  }
-
-  /* ==========================================================================
-     HUD
-     ========================================================================== */
-
+  /* ==================== HUD ==================== */
   function addBadge(container, label, value, extraClass = "") {
-    if (!container) return;
-    if (value <= 0) return;
-    const badge = document.createElement("span");
-    badge.className = `effect-badge ${extraClass}`.trim();
-    badge.textContent = `${label} ${value}`;
-    container.appendChild(badge);
+    if (!container || value <= 0) return;
+    const b = document.createElement("span");
+    b.className = `effect-badge ${extraClass}`.trim();
+    b.textContent = `${label} ${value}`;
+    container.appendChild(b);
   }
-
-  // B2: glifo arcano de la intención (trazo con currentColor, coherente con el ojo).
   function intentGlyph(kind) {
-    if (kind === "block") {
-      return `
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 3 L19 6 L19 12 C19 16.5 15.5 19.8 12 21 C8.5 19.8 5 16.5 5 12 L5 6 Z"
-                fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
-          <path d="M12 6.4 L12 18.4" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.55" />
-        </svg>`;
-    }
-    if (kind === "burn") {
-      return `
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 3 C13.8 6.6 16.8 8 16.2 12.4 C15.8 15.6 13.6 18 12 20.6 C10.4 18 8.2 15.6 7.8 12.4 C7.2 8.4 10.2 7 12 3 Z"
-                fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-          <path d="M12 9.4 C12.9 11 13.2 12.2 12.4 13.8 C12 14.6 11.4 13.9 11.4 13 C11.4 11.8 11.2 11 12 9.4 Z"
-                fill="currentColor" opacity="0.5" />
-        </svg>`;
-    }
-    // attack (espada/daga)
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M12 3 L14.2 13 L12 15.2 L9.8 13 Z"
-              fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
-        <path d="M8.2 13.6 L15.8 13.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-        <path d="M12 15.2 L12 19.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-        <circle cx="12" cy="20.4" r="1.1" fill="currentColor" />
-      </svg>`;
+    if (kind === "block") return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 L19 6 L19 12 C19 16.5 15.5 19.8 12 21 C8.5 19.8 5 16.5 5 12 L5 6 Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 6.4 L12 18.4" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.55"/></svg>`;
+    if (kind === "burn") return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 C13.8 6.6 16.8 8 16.2 12.4 C15.8 15.6 13.6 18 12 20.6 C10.4 18 8.2 15.6 7.8 12.4 C7.2 8.4 10.2 7 12 3 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 9.4 C12.9 11 13.2 12.2 12.4 13.8 C12 14.6 11.4 13.9 11.4 13 C11.4 11.8 11.2 11 12 9.4 Z" fill="currentColor" opacity="0.5"/></svg>`;
+    return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 L14.2 13 L12 15.2 L9.8 13 Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.2 13.6 L15.8 13.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M12 15.2 L12 19.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="20.4" r="1.1" fill="currentColor"/></svg>`;
   }
-
   function buildIntentElement(intent) {
     const card = document.createElement("div");
     card.className = `enemy-intent-card intent-${intent.kind}`;
     card.setAttribute("role", "img");
-    card.setAttribute(
-      "aria-label",
-      `El enemigo preparará ${intent.label} ${intent.value}`
-    );
-
-    const glyph = document.createElement("span");
-    glyph.className = "intent-glyph";
-    glyph.setAttribute("aria-hidden", "true");
-    glyph.innerHTML = intentGlyph(intent.kind);
-
-    const value = document.createElement("span");
-    value.className = "intent-value";
-    value.setAttribute("aria-hidden", "true");
-    value.textContent = intent.value;
-
-    const label = document.createElement("span");
-    label.className = "intent-label";
-    label.setAttribute("aria-hidden", "true");
-    label.textContent = intent.label;
-
-    card.appendChild(glyph);
-    card.appendChild(value);
-    card.appendChild(label);
+    card.setAttribute("aria-label", `El enemigo preparará ${intent.label} ${intent.value}`);
+    const g = document.createElement("span"); g.className = "intent-glyph"; g.setAttribute("aria-hidden","true"); g.innerHTML = intentGlyph(intent.kind);
+    const v = document.createElement("span"); v.className = "intent-value"; v.setAttribute("aria-hidden","true"); v.textContent = intent.value;
+    const l = document.createElement("span"); l.className = "intent-label"; l.setAttribute("aria-hidden","true"); l.textContent = intent.label;
+    card.appendChild(g); card.appendChild(v); card.appendChild(l);
     return card;
   }
-
   function renderHUD() {
     if (!state) return;
-
-    if (els.playerHp) {
-      els.playerHp.textContent = `${getPlayerHp()}/${getMaxPlayerHp()}`;
-    }
-    if (els.playerEffects) {
-      els.playerEffects.innerHTML = "";
-      addBadge(els.playerEffects, "Bloqueo", getBlock(), "block");
-      addBadge(els.playerEffects, "Quemadura", getBurn(), "burn");
-    }
-    if (els.ink) {
-      els.ink.textContent = `${getEnergy()}/${getMaxEnergy()}`;
-    }
-    if (els.enemyName) {
-      els.enemyName.textContent = getEnemyName();
-    }
-    if (els.enemyHp) {
-      els.enemyHp.textContent = `${getEnemyHp()}`;
-    }
-
+    if (els.playerHp) els.playerHp.textContent = `${getPlayerHp()}/${getMaxPlayerHp()}`;
+    if (els.playerEffects) { els.playerEffects.innerHTML = ""; addBadge(els.playerEffects, "Bloqueo", getBlock(), "block"); addBadge(els.playerEffects, "Quemadura", getBurn(), "burn"); }
+    if (els.ink) els.ink.textContent = `${getEnergy()}/${getMaxEnergy()}`;
+    if (els.enemyName) els.enemyName.textContent = getEnemyName();
+    if (els.enemyHp) els.enemyHp.textContent = `${getEnemyHp()}`;
     if (els.enemyIntent) {
       els.enemyIntent.innerHTML = "";
-
-      // B2: intención FUTURA destacada (solo si el enemigo vive).
       const intent = getEnemyIntent();
-      if (intent && getEnemyHp() > 0) {
-        els.enemyIntent.appendChild(buildIntentElement(intent));
-      }
-
-      // Efectos ACTUALES del enemigo (bloqueo que ya tiene / quemadura que le metiste).
-      const effectsRow = document.createElement("div");
-      effectsRow.className = "enemy-current-effects";
-      addBadge(effectsRow, "Bloqueo", getEnemyBlock(), "block");
-      addBadge(effectsRow, "Quemadura", getEnemyBurn(), "burn");
-      if (effectsRow.childNodes.length > 0) {
-        els.enemyIntent.appendChild(effectsRow);
-      }
+      if (intent && getEnemyHp() > 0) els.enemyIntent.appendChild(buildIntentElement(intent));
+      const er = document.createElement("div"); er.className = "enemy-current-effects";
+      addBadge(er, "Bloqueo", getEnemyBlock(), "block"); addBadge(er, "Quemadura", getEnemyBurn(), "burn");
+      if (er.childNodes.length > 0) els.enemyIntent.appendChild(er);
     }
   }
+  function renderDeckStatus() { if (els.grimoireCount) els.grimoireCount.textContent = getDrawCount(); if (els.ashesCount) els.ashesCount.textContent = getDiscardCount(); }
 
-  function renderDeckStatus() {
-    if (els.grimoireCount) els.grimoireCount.textContent = getDrawCount();
-    if (els.ashesCount) els.ashesCount.textContent = getDiscardCount();
-  }
-
-  /* ==========================================================================
-     TEXTOS FLOTANTES
-     ========================================================================== */
-
+  /* ==================== TEXTOS FLOTANTES ==================== */
   function spawnFloat(text, type = "damage", side = "center") {
     if (!els.floats) return;
-    const float = document.createElement("div");
-    float.className = `float-text ${type}`;
-    float.textContent = text;
-
-    let leftPercent = 50;
-    if (side === "player") leftPercent = 36;
-    if (side === "enemy") leftPercent = 64;
-    leftPercent += Math.random() * 10 - 5;
-
-    const topPercent = 32 + Math.random() * 20;
-    float.style.left = `${leftPercent}%`;
-    float.style.top = `${topPercent}%`;
-
-    els.floats.appendChild(float);
-    setTimeout(() => { float.remove(); }, 950);
+    const f = document.createElement("div"); f.className = `float-text ${type}`; f.textContent = text;
+    let lp = 50; if (side === "player") lp = 36; if (side === "enemy") lp = 64;
+    lp += Math.random() * 10 - 5;
+    f.style.left = `${lp}%`; f.style.top = `${32 + Math.random() * 20}%`;
+    els.floats.appendChild(f); setTimeout(() => f.remove(), 950);
   }
-
-  function snapshot() {
-    return {
-      playerHp: getPlayerHp(),
-      enemyHp: getEnemyHp(),
-      energy: getEnergy(),
-      block: getBlock(),
-      burn: getBurn(),
-      enemyBlock: getEnemyBlock(),
-      enemyBurn: getEnemyBurn(),
-      handLength: Array.isArray(state?.hand) ? state.hand.length : 0
-    };
-  }
-
+  function snapshot() { return { playerHp: getPlayerHp(), enemyHp: getEnemyHp(), energy: getEnergy(), block: getBlock(), burn: getBurn(), enemyBlock: getEnemyBlock(), enemyBurn: getEnemyBurn(), handLength: Array.isArray(state?.hand) ? state.hand.length : 0 }; }
   function showDiffs(before, after) {
-    const enemyDamage = before.enemyHp - after.enemyHp;
-    if (enemyDamage > 0) spawnFloat(`-${enemyDamage}`, "damage", "enemy");
-
-    const playerDamage = before.playerHp - after.playerHp;
-    if (playerDamage > 0) spawnFloat(`-${playerDamage}`, "damage", "player");
-
-    const playerHeal = after.playerHp - before.playerHp;
-    if (playerHeal > 0) spawnFloat(`+${playerHeal}`, "heal", "player");
-
-    const blockGain = after.block - before.block;
-    if (blockGain > 0) spawnFloat(`+${blockGain} bloqueo`, "block", "player");
-
-    const burnGain = after.burn - before.burn;
-    if (burnGain > 0) spawnFloat(`${burnGain} quemadura`, "burn", "player");
-
-    const enemyBlockGain = after.enemyBlock - before.enemyBlock;
-    if (enemyBlockGain > 0) spawnFloat(`+${enemyBlockGain} bloqueo`, "block", "enemy");
-
-    const enemyBurnGain = after.enemyBurn - before.enemyBurn;
-    if (enemyBurnGain > 0) spawnFloat(`${enemyBurnGain} quemadura`, "burn", "enemy");
+    const ed = before.enemyHp - after.enemyHp; if (ed > 0) spawnFloat(`-${ed}`, "damage", "enemy");
+    const pd = before.playerHp - after.playerHp; if (pd > 0) spawnFloat(`-${pd}`, "damage", "player");
+    const ph = after.playerHp - before.playerHp; if (ph > 0) spawnFloat(`+${ph}`, "heal", "player");
+    const bg = after.block - before.block; if (bg > 0) spawnFloat(`+${bg} bloqueo`, "block", "player");
+    const brg = after.burn - before.burn; if (brg > 0) spawnFloat(`${brg} quemadura`, "burn", "player");
+    const ebg = after.enemyBlock - before.enemyBlock; if (ebg > 0) spawnFloat(`+${ebg} bloqueo`, "block", "enemy");
+    const ebrg = after.enemyBurn - before.enemyBurn; if (ebrg > 0) spawnFloat(`${ebrg} quemadura`, "burn", "enemy");
   }
 
-  /* ==========================================================================
-     PÁGINAS / CARTAS (solo la carta de MANO)
-     ========================================================================== */
-
+  /* ==================== CARTAS (mano) ==================== */
   function createInspectButton(card) {
     const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "card-inspect-btn";
+    btn.type = "button"; btn.className = "card-inspect-btn";
     btn.setAttribute("aria-label", `Inspeccionar ${card?.name || "página"}`);
     btn.title = "Inspeccionar página";
-    btn.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M2.5 12 C 6 5.5, 18 5.5, 21.5 12 C 18 18.5, 6 18.5, 2.5 12 Z"
-              fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-        <circle class="eye-iris" cx="12" cy="12" r="3.4" fill="currentColor" />
-        <circle cx="12" cy="12" r="1.4" fill="#05070f" />
-        <circle cx="13.1" cy="10.9" r="0.7" fill="#f8fafc" opacity="0.85" />
-      </svg>
-    `;
-    btn.addEventListener("pointerdown", (event) => event.stopPropagation());
-    btn.addEventListener("pointerup", (event) => event.stopPropagation());
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openInspect(card);
-    });
+    btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12 C 6 5.5, 18 5.5, 21.5 12 C 18 18.5, 6 18.5, 2.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle class="eye-iris" cx="12" cy="12" r="3.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="#05070f"/><circle cx="13.1" cy="10.9" r="0.7" fill="#f8fafc" opacity="0.85"/></svg>`;
+    btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+    btn.addEventListener("pointerup", (e) => e.stopPropagation());
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openInspect(card); });
     return btn;
   }
-
+  function buildMechHtml(card) {
+    const effects = describeEffects(card), keywords = describeKeywords(card);
+    let html = '<div class="page-mech">';
+    if (effects.length) html += '<ul class="page-effects">' + effects.map((t) => `<li class="effect-line">${escapeHtml(t)}</li>`).join("") + "</ul>";
+    if (keywords.length) html += '<div class="page-keywords">' + keywords.map((t) => `<span class="keyword-badge">${escapeHtml(t)}</span>`).join("") + "</div>";
+    html += "</div>"; return html;
+  }
   function createPageElement(card, index = null) {
     const element = document.createElement("article");
     element.className = "page-card";
-
     if (card?.type) element.dataset.type = String(card.type);
-    if (card?.heal) element.classList.add("is-heal");
+    if (hasEffect(card, "heal")) element.classList.add("is-heal");
     if (card?.curse) element.classList.add("is-curse");
     if (card?.corrupted) element.classList.add("is-corrupted");
     if (!canPlayCard(card)) element.classList.add("is-disabled");
-
-    element.tabIndex = 0;
-    element.setAttribute("role", "listitem");
-    element.setAttribute(
-      "aria-label",
-      `${card?.name || "Página"}, coste ${cardCost(card)}, ${card?.desc || "sin descripción"}`
-    );
-
-    element.innerHTML = `
-      <div class="page-header">
-        <span class="page-cost">${escapeHtml(cardCost(card))}</span>
-        <h3 class="page-name">${escapeHtml(card?.name || "Página sin nombre")}</h3>
-      </div>
-      <p class="page-type">${escapeHtml(typeLabel(card))}</p>
-      <p class="page-desc">${escapeHtml(card?.desc || "Sin descripción.")}</p>
-    `;
-
-    // Ojo arcano abajo-izquierda, fuera del flujo para que el nombre no lo exprima.
+    element.tabIndex = 0; element.setAttribute("role", "listitem");
+    const eff = describeEffects(card).join(", "), kw = describeKeywords(card).join(", ");
+    element.setAttribute("aria-label", `${card?.name || "Página"}, coste ${cardCost(card)}. ${eff}${kw ? ". " + kw : ""}. ${card?.desc || ""}`);
+    element.innerHTML = `<div class="page-header"><span class="page-cost">${escapeHtml(cardCost(card))}</span><h3 class="page-name">${escapeHtml(card?.name || "Página sin nombre")}</h3></div><p class="page-type">${escapeHtml(typeLabel(card))}</p>${buildMechHtml(card)}<p class="page-desc">${escapeHtml(card?.desc || "Sin descripción.")}</p>`;
     element.appendChild(createInspectButton(card));
-
-    if (typeof index === "number") {
-      attachCardEvents(element, card, index);
-    }
-
+    if (typeof index === "number") attachCardEvents(element, card, index);
     return element;
   }
-
   function attachCardEvents(element, card, index) {
-    element.addEventListener("contextmenu", (event) => event.preventDefault());
-
-    element.addEventListener("pointerdown", (event) => {
-      activeCardElement = element;
-      pressStartedAt = Date.now();
-      pressStartX = event.clientX;
-      pressStartY = event.clientY;
-      pressMoved = false;
+    element.addEventListener("contextmenu", (e) => e.preventDefault());
+    element.addEventListener("pointerdown", (e) => {
+      activeCardElement = element; pressStartedAt = Date.now(); pressStartX = e.clientX; pressStartY = e.clientY; pressMoved = false;
       clearTimeout(longPressTimer);
-      longPressTimer = setTimeout(() => {
-        if (activeCardElement === element && !pressMoved) {
-          openInspect(card);
-          activeCardElement = null;
-        }
-      }, LONG_PRESS_MS);
+      longPressTimer = setTimeout(() => { if (activeCardElement === element && !pressMoved) { openInspect(card); activeCardElement = null; } }, LONG_PRESS_MS);
     });
-
-    element.addEventListener("pointermove", (event) => {
+    element.addEventListener("pointermove", (e) => {
       if (activeCardElement !== element) return;
-      const dx = event.clientX - pressStartX;
-      const dy = event.clientY - pressStartY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance > MOVE_THRESHOLD) {
-        pressMoved = true;
-        clearTimeout(longPressTimer);
-      }
+      const dx = e.clientX - pressStartX, dy = e.clientY - pressStartY;
+      if (Math.sqrt(dx*dx+dy*dy) > MOVE_THRESHOLD) { pressMoved = true; clearTimeout(longPressTimer); }
     });
-
     element.addEventListener("pointerup", () => {
       clearTimeout(longPressTimer);
-      if (
-        activeCardElement === element &&
-        !pressMoved &&
-        Date.now() - pressStartedAt < LONG_PRESS_MS
-      ) {
-        tryPlayCard(index, element);
-      }
+      if (activeCardElement === element && !pressMoved && Date.now() - pressStartedAt < LONG_PRESS_MS) tryPlayCard(index, element);
       activeCardElement = null;
     });
-
-    element.addEventListener("pointercancel", () => {
-      clearTimeout(longPressTimer);
-      activeCardElement = null;
-    });
-
-    element.addEventListener("keydown", (event) => {
-      // Si el foco está en el botón de inspección, no duplicar acción.
-      if (event.target !== element) return;
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        tryPlayCard(index, element);
-      }
-      if (event.key.toLowerCase() === "i") {
-        event.preventDefault();
-        openInspect(card);
-      }
+    element.addEventListener("pointercancel", () => { clearTimeout(longPressTimer); activeCardElement = null; });
+    element.addEventListener("keydown", (e) => {
+      if (e.target !== element) return;
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tryPlayCard(index, element); }
+      if (e.key.toLowerCase() === "i") { e.preventDefault(); openInspect(card); }
     });
   }
-
   function renderHand() {
-    if (!els.hand) return;
-    els.hand.innerHTML = "";
-
+    if (!els.hand) return; els.hand.innerHTML = "";
     const hand = Array.isArray(state?.hand) ? state.hand : [];
-
-    if (hand.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "battle-message";
-      empty.style.position = "static";
-      empty.style.transform = "none";
-      empty.style.margin = "0";
-      empty.textContent = "No hay páginas abiertas.";
-      els.hand.appendChild(empty);
-      return;
-    }
-
-    hand.forEach((card, index) => {
-      const page = createPageElement(card, index);
-      els.hand.appendChild(page);
-    });
+    if (hand.length === 0) { const e = document.createElement("p"); e.className = "battle-message"; e.style.cssText = "position:static;transform:none;margin:0"; e.textContent = "No hay páginas abiertas."; els.hand.appendChild(e); return; }
+    hand.forEach((card, i) => els.hand.appendChild(createPageElement(card, i)));
   }
 
-  /* ==========================================================================
-     INSPECCIÓN (carta vertical: arte arriba + texto abajo, sin scroll interno)
-     ========================================================================== */
-
+  /* ==================== INSPECCIÓN ==================== */
   function fillInspectCard(card) {
     if (!els.inspectCard) return;
-
     els.inspectCard.className = "page-card page-card-large";
-    if (card?.type) {
-      els.inspectCard.dataset.type = String(card.type);
-    } else {
-      delete els.inspectCard.dataset.type;
-    }
-    if (card?.heal) els.inspectCard.classList.add("is-heal");
+    if (card?.type) els.inspectCard.dataset.type = String(card.type); else delete els.inspectCard.dataset.type;
+    if (hasEffect(card, "heal")) els.inspectCard.classList.add("is-heal");
     if (card?.curse) els.inspectCard.classList.add("is-curse");
     if (card?.corrupted) els.inspectCard.classList.add("is-corrupted");
-
-    const art = document.createElement("div");
-    art.className = "page-art";
-    art.setAttribute("aria-hidden", "true");
-    art.innerHTML = `<span class="page-art-glyph">✦</span>`;
-
-    const body = document.createElement("div");
-    body.className = "page-body";
-    body.innerHTML = `
-      <div class="page-header">
-        <span class="page-cost">${escapeHtml(cardCost(card))}</span>
-        <h3 class="page-name">${escapeHtml(card?.name || "Página sin nombre")}</h3>
-      </div>
-      <p class="page-type">${escapeHtml(typeLabel(card))}</p>
-      <p class="page-desc">${escapeHtml(card?.desc || "Sin descripción.")}</p>
-    `;
-
+    const art = document.createElement("div"); art.className = "page-art"; art.setAttribute("aria-hidden","true"); art.innerHTML = `<span class="page-art-glyph">✦</span>`;
+    const body = document.createElement("div"); body.className = "page-body";
+    body.innerHTML = `<div class="page-header"><span class="page-cost">${escapeHtml(cardCost(card))}</span><h3 class="page-name">${escapeHtml(card?.name || "Página sin nombre")}</h3></div><p class="page-type">${escapeHtml(typeLabel(card))}</p>${buildMechHtml(card)}<p class="page-desc">${escapeHtml(card?.desc || "Sin descripción.")}</p>`;
     els.inspectCard.replaceChildren(art, body);
   }
+  function openInspect(card) { if (!els.inspect || !els.inspectCard) return; fillInspectCard(card); els.inspect.hidden = false; }
+  function closeInspect() { if (els.inspect) els.inspect.hidden = true; }
 
-  function openInspect(card) {
-    if (!els.inspect || !els.inspectCard) return;
-    fillInspectCard(card);
-    els.inspect.hidden = false;
-  }
-
-  function closeInspect() {
-    if (!els.inspect) return;
-    els.inspect.hidden = true;
-  }
-
-  /* ==========================================================================
-     OVERLAY DE GRIMORIO / CENIZAS
-     ========================================================================== */
-
+  /* ==================== OVERLAY GRIMORIO / CENIZAS ==================== */
   function createDeckItem(card) {
-    const element = document.createElement("article");
-    element.className = "deck-item";
-    element.setAttribute("role", "listitem");
-    element.innerHTML = `
-      <span class="mini-cost">${escapeHtml(cardCost(card))}</span>
-      <div class="deck-item-body">
-        <h3 class="deck-item-name">${escapeHtml(card?.name || "Página sin nombre")}</h3>
-        <p class="deck-item-meta">${escapeHtml(typeLabel(card))}</p>
-        <p class="deck-item-desc">${escapeHtml(card?.desc || "Sin descripción.")}</p>
-      </div>
-    `;
+    const element = document.createElement("article"); element.className = "deck-item"; element.setAttribute("role","listitem");
+    const effects = describeEffects(card), keywords = describeKeywords(card);
+    let mechHtml = "";
+    if (effects.length || keywords.length) {
+      mechHtml = '<div class="deck-item-mech">';
+      if (effects.length) mechHtml += '<ul class="deck-item-effects">' + effects.map((t) => `<li>${escapeHtml(t)}</li>`).join("") + "</ul>";
+      if (keywords.length) mechHtml += '<div class="deck-item-keywords">' + keywords.map((t) => `<span class="deck-keyword-badge">${escapeHtml(t)}</span>`).join("") + "</div>";
+      mechHtml += "</div>";
+    }
+    element.innerHTML = `<span class="mini-cost">${escapeHtml(cardCost(card))}</span><div class="deck-item-body"><h3 class="deck-item-name">${escapeHtml(card?.name || "Página sin nombre")}</h3><p class="deck-item-meta">${escapeHtml(typeLabel(card))}</p>${mechHtml}<p class="deck-item-desc">${escapeHtml(card?.desc || "Sin descripción.")}</p></div>`;
     return element;
   }
-
   function openDeckOverlay(mode) {
     if (!els.deckOverlay || !els.deckList) return;
-    const isGrimoire = mode === "grimoire";
-
-    if (els.deckTitle) els.deckTitle.textContent = isGrimoire ? "Grimorio" : "Cenizas";
-    if (els.deckSubtitle) {
-      els.deckSubtitle.textContent = isGrimoire
-        ? "Páginas que aún puedes robar."
-        : "Páginas ya usadas o descartadas.";
-    }
-
+    const isG = mode === "grimoire";
+    if (els.deckTitle) els.deckTitle.textContent = isG ? "Grimorio" : "Cenizas";
+    if (els.deckSubtitle) els.deckSubtitle.textContent = isG ? "Páginas que aún puedes robar." : "Páginas ya usadas o descartadas.";
     els.deckList.innerHTML = "";
-    const pile = isGrimoire ? getDrawPileArray() : getDiscardPileArray();
-    const count = isGrimoire ? getDrawCount() : getDiscardCount();
-
-    if (pile.length > 0) {
-      pile.forEach((card) => els.deckList.appendChild(createDeckItem(card)));
-    } else if (count > 0) {
-      const empty = document.createElement("p");
-      empty.className = "deck-empty";
-      empty.textContent = isGrimoire
-        ? "El grimorio oculta estas páginas por ahora."
-        : "Las cenizas guardan silencio por ahora.";
-      els.deckList.appendChild(empty);
-    } else {
-      const empty = document.createElement("p");
-      empty.className = "deck-empty";
-      empty.textContent = isGrimoire
-        ? "No quedan páginas por robar."
-        : "No hay cenizas todavía.";
-      els.deckList.appendChild(empty);
-    }
-
+    const pile = isG ? getDrawPileArray() : getDiscardPileArray();
+    const count = isG ? getDrawCount() : getDiscardCount();
+    if (pile.length > 0) { pile.forEach((c) => els.deckList.appendChild(createDeckItem(c))); }
+    else if (count > 0) { const e = document.createElement("p"); e.className = "deck-empty"; e.textContent = isG ? "El grimorio oculta estas páginas por ahora." : "Las cenizas guardan silencio por ahora."; els.deckList.appendChild(e); }
+    else { const e = document.createElement("p"); e.className = "deck-empty"; e.textContent = isG ? "No quedan páginas por robar." : "No hay cenizas todavía."; els.deckList.appendChild(e); }
     els.deckOverlay.hidden = false;
   }
+  function closeDeckOverlay() { if (els.deckOverlay) els.deckOverlay.hidden = true; }
 
-  function closeDeckOverlay() {
-    if (!els.deckOverlay) return;
-    els.deckOverlay.hidden = true;
-  }
-
-  /* ==========================================================================
-     AUTOGUARDADO (A.2)
-     ========================================================================== */
-
+  /* ==================== AUTOGUARDADO ==================== */
   function peekSave() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (typeof GameState === "undefined" || typeof GameState.fromSave !== "function") {
-        return null;
-      }
-      const instance = GameState.fromSave(data);
-      if (!instance) {
-        clearSave();
-        return null;
-      }
-      return instance;
-    } catch (error) {
-      console.warn("No se pudo leer la partida guardada:", error);
-      clearSave();
-      return null;
-    }
+      if (typeof GameState === "undefined" || typeof GameState.fromSave !== "function") return null;
+      const inst = GameState.fromSave(data);
+      if (!inst) { clearSave(); return null; }
+      return inst;
+    } catch (e) { console.warn("No se pudo leer la partida guardada:", e); clearSave(); return null; }
   }
-
   function saveGame() {
     if (!state || typeof state.serialize !== "function") return;
-    try {
-      const payload = state.serialize();
-      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-      showToast();
-    } catch (error) {
-      console.warn("No se pudo guardar la partida:", error);
-    }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(state.serialize())); showToast(); }
+    catch (e) { console.warn("No se pudo guardar:", e); }
   }
-
-  function clearSave() {
-    try {
-      localStorage.removeItem(SAVE_KEY);
-    } catch (error) {
-      /* almacenamiento no disponible: ignorar */
-    }
-  }
-
-  function persistAfterAction() {
-    if (isResultVisible()) {
-      clearSave();
-    } else {
-      saveGame();
-    }
-  }
-
+  function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+  function persistAfterAction() { if (isResultVisible()) clearSave(); else saveGame(); }
   function showToast() {
-    if (!saveToastEl) {
-      saveToastEl = document.createElement("div");
-      saveToastEl.className = "save-toast";
-      saveToastEl.setAttribute("role", "status");
-      saveToastEl.setAttribute("aria-live", "polite");
-      saveToastEl.textContent = "Progreso guardado";
-      document.body.appendChild(saveToastEl);
-    }
-    saveToastEl.classList.add("is-visible");
-    clearTimeout(saveToastTimer);
-    saveToastTimer = setTimeout(() => {
-      if (saveToastEl) saveToastEl.classList.remove("is-visible");
-    }, 1200);
+    if (!saveToastEl) { saveToastEl = document.createElement("div"); saveToastEl.className = "save-toast"; saveToastEl.setAttribute("role","status"); saveToastEl.setAttribute("aria-live","polite"); saveToastEl.textContent = "Progreso guardado"; document.body.appendChild(saveToastEl); }
+    saveToastEl.classList.add("is-visible"); clearTimeout(saveToastTimer);
+    saveToastTimer = setTimeout(() => { if (saveToastEl) saveToastEl.classList.remove("is-visible"); }, 1200);
   }
 
-  function showContinueOverlay() {
-    if (document.getElementById("continue-overlay")) return;
-    const overlay = document.createElement("div");
-    overlay.id = "continue-overlay";
-    overlay.className = "overlay continue-overlay";
-    overlay.setAttribute("role", "dialog");
-    overlay.setAttribute("aria-modal", "true");
-    overlay.setAttribute("aria-labelledby", "continue-title");
-    overlay.innerHTML = `
-      <div class="overlay-card continue-card">
-        <h2 id="continue-title">El grimorio recuerda</h2>
-        <p>Queda un ritual sin cerrar entre sus páginas. ¿Deseas continuarlo, o abrir el libro de nuevo?</p>
+  /* ==================== M1: NAVEGACIÓN ==================== */
+
+  function hasSave() {
+    try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+  }
+
+  function refreshContinueButton() {
+    if (els.continueGame) els.continueGame.hidden = !hasSave();
+  }
+
+  // M1-HUB (fix): el menú llena la pantalla y entra con animación.
+  function showMenu() {
+    currentScreen = "menu";
+    started = false;
+    state = null;
+    hideAllSubScreens();
+    closeInspect();
+    closeDeckOverlay();
+    if (els.result) els.result.hidden = true;
+    if (els.intro) {
+      els.intro.hidden = false;
+      els.intro.classList.remove("menu-hub--leaving");
+      if (!prefersReducedMotion) {
+        els.intro.classList.remove("menu-hub--entering");
+        void els.intro.offsetWidth; // reflow: reinicia la animación si ya estaba puesta
+        els.intro.classList.add("menu-hub--entering");
+      }
+    }
+    refreshContinueButton();
+    setMenuVisualMode(true);
+  }
+
+  // M1-HUB (fix): al entrar en combate, la esfera hace zoom-in + fundido antes de ocultarse.
+  function showCombat() {
+    currentScreen = "combat";
+    hideAllSubScreens();
+    if (els.result) els.result.hidden = true;
+    setMenuVisualMode(false); // para RAF/listeners/partículas de inmediato
+    if (els.intro) {
+      if (prefersReducedMotion) {
+        els.intro.hidden = true;
+        els.intro.classList.remove("menu-hub--entering", "menu-hub--leaving");
+      } else {
+        els.intro.classList.remove("menu-hub--entering");
+        els.intro.classList.add("menu-hub--leaving");
+        setTimeout(() => {
+          // Solo oculta si seguimos en combate (guard lightweight anti-solape).
+          if (currentScreen === "combat" && els.intro) {
+            els.intro.hidden = true;
+            els.intro.classList.remove("menu-hub--leaving");
+          }
+        }, 420);
+      }
+    }
+  }
+
+  function hideAllSubScreens() {
+    if (els.historyScreen) els.historyScreen.hidden = true;
+    if (els.settingsScreen) els.settingsScreen.hidden = true;
+    if (els.loreScreen) els.loreScreen.hidden = true;
+  }
+
+  function openSubScreen(el) {
+    if (!el) return;
+    hideAllSubScreens();
+    el.hidden = false;
+  }
+
+  function showConfirmDiscard(onYes) {
+    if (document.getElementById("confirm-discard-overlay")) return;
+    const ov = document.createElement("div");
+    ov.id = "confirm-discard-overlay";
+    ov.className = "overlay";
+    ov.setAttribute("role", "dialog");
+    ov.setAttribute("aria-modal", "true");
+    ov.innerHTML = `
+      <div class="overlay-card">
+        <h2>¿Descartar el ritual actual?</h2>
+        <p>Queda una página sin cerrar entre las cenizas. Si abres el grimorio de nuevo, se perderá.</p>
         <div class="continue-actions">
-          <button id="continue-resume" class="ritual-button" type="button">Continuar el ritual</button>
-          <button id="continue-new" class="ritual-button secondary-button" type="button">Nueva página</button>
+          <button id="confirm-discard-yes" class="ritual-button" type="button">Descartar y abrir</button>
+          <button id="confirm-discard-no" class="ritual-button secondary-button" type="button">Volver</button>
         </div>
       </div>
     `;
-    document.body.appendChild(overlay);
-    overlay.querySelector("#continue-resume").addEventListener("click", continueFromSave);
-    overlay.querySelector("#continue-new").addEventListener("click", () => {
-      hideContinueOverlay();
-      startGame();
-    });
+    document.body.appendChild(ov);
+    ov.querySelector("#confirm-discard-yes").addEventListener("click", () => { ov.remove(); onYes(); });
+    ov.querySelector("#confirm-discard-no").addEventListener("click", () => { ov.remove(); });
   }
 
-  function hideContinueOverlay() {
-    const el = document.getElementById("continue-overlay");
-    if (el) el.remove();
+  function startNewRun() {
+    hideContinueOverlay();
+    pendingLoadedState = null;
+    state = createGameState();
+    started = true;
+    showCombat();
+    closeInspect(); closeDeckOverlay(); resetSensorNeutral();
+    renderAll();
+    setMessage("El grimorio se abre. Recupera las páginas perdidas.");
+  }
+
+  function handleNewRunClick() {
+    if (hasSave()) {
+      showConfirmDiscard(() => { clearSave(); startNewRun(); });
+    } else {
+      startNewRun();
+    }
   }
 
   function continueFromSave() {
-    if (!pendingLoadedState) {
-      hideContinueOverlay();
-      startGame();
-      return;
-    }
-    state = pendingLoadedState;
-    pendingLoadedState = null;
-    started = true;
+    if (!pendingLoadedState) { hideContinueOverlay(); handleNewRunClick(); return; }
+    state = pendingLoadedState; pendingLoadedState = null; started = true;
     hideContinueOverlay();
-    if (els.intro) els.intro.hidden = true;
-    if (els.result) els.result.hidden = true;
-    closeInspect();
-    closeDeckOverlay();
-    resetSensorNeutral();
+    showCombat();
+    closeInspect(); closeDeckOverlay(); resetSensorNeutral();
     renderAll();
     setMessage("El ritual continúa donde lo dejaste.");
   }
 
-  /* ==========================================================================
-     ACCIONES DE JUEGO
-     ========================================================================== */
+  function showContinueOverlay() {
+    if (document.getElementById("continue-overlay")) return;
+    const ov = document.createElement("div");
+    ov.id = "continue-overlay"; ov.className = "overlay continue-overlay";
+    ov.setAttribute("role","dialog"); ov.setAttribute("aria-modal","true"); ov.setAttribute("aria-labelledby","continue-title");
+    ov.innerHTML = `<div class="overlay-card continue-card"><h2 id="continue-title">El grimorio recuerda</h2><p>Queda un ritual sin cerrar entre sus páginas. ¿Deseas continuarlo, o abrir el libro de nuevo?</p><div class="continue-actions"><button id="continue-resume" class="ritual-button" type="button">Continuar el ritual</button><button id="continue-new" class="ritual-button secondary-button" type="button">Nueva página</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector("#continue-resume").addEventListener("click", continueFromSave);
+    ov.querySelector("#continue-new").addEventListener("click", () => { hideContinueOverlay(); startNewRun(); });
+  }
+  function hideContinueOverlay() { const el = document.getElementById("continue-overlay"); if (el) el.remove(); }
 
-  function isResultVisible() {
-    return els.result && els.result.hidden === false;
+  /* ==================== M1-HUB: LÓGICA DE ÓRBITA Y PARTÍCULAS ==================== */
+
+  let menuOrbitActive = false;
+  let menuTargetX = 0;
+  let menuTargetY = 0;
+  let menuCurrentX = 0;
+  let menuCurrentY = 0;
+  const MENU_EASE = 0.05;
+  const MENU_MAX_MOVE = 12;
+
+  function updateMenuOrbitTargets(nx, ny) {
+    if (!menuOrbitActive || prefersReducedMotion) return;
+    const x = clampValue(nx, -1, 1);
+    const y = clampValue(ny, -1, 1);
+    menuTargetX = x * MENU_MAX_MOVE;
+    menuTargetY = y * MENU_MAX_MOVE;
   }
 
+  function onMenuPointerMove(event) {
+    if (!menuOrbitActive) return;
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
+    const nx = (event.clientX / w - 0.5) * 2;
+    const ny = (event.clientY / h - 0.5) * 2;
+    updateMenuOrbitTargets(nx, ny);
+  }
+
+  function onMenuDeviceOrientation(event) {
+    if (!menuOrbitActive || prefersReducedMotion) return;
+    const hasBeta = typeof event.beta === "number" && Number.isFinite(event.beta);
+    const hasGamma = typeof event.gamma === "number" && Number.isFinite(event.gamma);
+    if (!hasBeta || !hasGamma) return;
+    const gammaNorm = clampValue(event.gamma / 45, -1, 1);
+    const betaNorm = clampValue((event.beta - 45) / 45, -1, 1);
+    updateMenuOrbitTargets(gammaNorm, betaNorm);
+  }
+
+  function animateMenuOrbit() {
+    if (!menuOrbitActive) return;
+    menuCurrentX += (menuTargetX - menuCurrentX) * MENU_EASE;
+    menuCurrentY += (menuTargetY - menuCurrentY) * MENU_EASE;
+    const wrapper = document.querySelector(".arcane-orb-wrapper");
+    if (wrapper) {
+      wrapper.style.transform = `translate3d(${menuCurrentX.toFixed(2)}px, ${menuCurrentY.toFixed(2)}px, 0)`;
+    }
+    requestAnimationFrame(animateMenuOrbit);
+  }
+
+  function spawnMenuParticles() {
+    const container = document.getElementById("artifact-particles");
+    if (!container || prefersReducedMotion) return;
+    for (let i = 0; i < 15; i++) createParticle(container);
+    setInterval(() => {
+      if (menuOrbitActive && container.children.length < 20) createParticle(container);
+    }, 2000);
+  }
+
+  function createParticle(container) {
+    const p = document.createElement("div");
+    const size = Math.random() * 3 + 1;
+    const isGold = Math.random() > 0.5;
+    p.style.position = "absolute";
+    p.style.width = `${size}px`;
+    p.style.height = `${size}px`;
+    p.style.borderRadius = "50%";
+    p.style.background = isGold ? "var(--gold)" : "var(--purple-light)";
+    p.style.boxShadow = `0 0 ${size * 2}px ${isGold ? "rgba(251,191,36,0.6)" : "rgba(192,132,252,0.6)"}`;
+    p.style.pointerEvents = "none";
+    p.style.opacity = "0";
+    p.style.left = `${Math.random() * 100}%`;
+    p.style.top = `${Math.random() * 100}%`;
+    container.appendChild(p);
+    const duration = 4000 + Math.random() * 4000;
+    const driftX = (Math.random() - 0.5) * 50;
+    const driftY = -(50 + Math.random() * 100);
+    const anim = p.animate([
+      { transform: "translate(0, 0)", opacity: 0 },
+      { transform: `translate(${driftX}px, ${driftY / 2}px)`, opacity: 0.8, offset: 0.2 },
+      { transform: `translate(${driftX * 2}px, ${driftY}px)`, opacity: 0 }
+    ], { duration: duration, easing: "ease-out", fill: "forwards" });
+    anim.onfinish = () => p.remove();
+  }
+
+  function setMenuVisualMode(active) {
+    menuOrbitActive = active;
+    if (active) {
+      window.addEventListener("pointermove", onMenuPointerMove, { passive: true });
+      window.addEventListener("deviceorientation", onMenuDeviceOrientation, { passive: true });
+      animateMenuOrbit();
+      spawnMenuParticles();
+    } else {
+      window.removeEventListener("pointermove", onMenuPointerMove);
+      window.removeEventListener("deviceorientation", onMenuDeviceOrientation);
+      const container = document.getElementById("artifact-particles");
+      if (container) container.innerHTML = "";
+    }
+  }
+
+  /* ==================== ACCIONES DE JUEGO ==================== */
+  function isResultVisible() { return els.result && els.result.hidden === false; }
   function tryPlayCard(index, element) {
     if (!started || isResultVisible()) return;
-
-    const card = state?.hand?.[index];
-    if (!card) return;
-
-    if (!canPlayCard(card)) {
-      setMessage("No hay tinta suficiente para esta página.");
-      shake(element);
-      return;
-    }
-
+    const card = state?.hand?.[index]; if (!card) return;
+    if (!canPlayCard(card)) { setMessage("No hay tinta suficiente para esta página."); shake(element); return; }
     const before = snapshot();
     let result;
-    try {
-      result = state.playCard(index);
-    } catch (error) {
-      console.error(error);
-      setMessage("El grimorio rechaza esa página.");
-      shake(element);
-      return;
-    }
-
-    if (result === false) {
-      setMessage("No se pudo lanzar la página.");
-      shake(element);
-      return;
-    }
-
-    const after = snapshot();
-    showDiffs(before, after);
+    try { result = state.playCard(index); } catch (e) { console.error(e); setMessage("El grimorio rechaza esa página."); shake(element); return; }
+    if (result === false) { setMessage("No se pudo lanzar la página."); shake(element); return; }
+    const after = snapshot(); showDiffs(before, after);
     setMessage(`Has usado: ${card.name || "una página"}.`);
-    renderAll();
-    checkResult();
-    persistAfterAction();
+    renderAll(); checkResult(); persistAfterAction();
   }
-
   function endTurn() {
     if (!started || isResultVisible()) return;
-
     const before = snapshot();
-    try {
-      state.endTurn();
-    } catch (error) {
-      console.error(error);
-      setMessage("El ritual se ha interrumpido.");
-      return;
-    }
-    const after = snapshot();
-    showDiffs(before, after);
-
-    if (getEnemyHp() <= 0) {
-      setMessage("La amenaza ha sido sellada.");
-    } else if (getPlayerHp() <= 0) {
-      setMessage("El grimorio te ha consumido.");
-    } else {
-      setMessage("El enemigo ha actuado.");
-    }
-
-    renderAll();
-    checkResult();
-    persistAfterAction();
+    try { state.endTurn(); } catch (e) { console.error(e); setMessage("El ritual se ha interrumpido."); return; }
+    const after = snapshot(); showDiffs(before, after);
+    if (getEnemyHp() <= 0) setMessage("La amenaza ha sido sellada.");
+    else if (getPlayerHp() <= 0) setMessage("El grimorio te ha consumido.");
+    else setMessage("El enemigo ha actuado.");
+    renderAll(); checkResult(); persistAfterAction();
   }
 
-  /* ==========================================================================
-     RESULTADO
-     ========================================================================== */
-
+  /* ==================== RESULTADO ==================== */
   function showResult(victory) {
     if (!els.result) return;
     started = false;
-
-    if (els.resultTitle) {
-      els.resultTitle.textContent = victory
-        ? "Página recuperada"
-        : "El grimorio te reclama";
-    }
-    if (els.resultText) {
-      els.resultText.textContent = victory
-        ? "Has sobrevivido al ritual y has recuperado una página perdida del grimorio."
-        : "Tu vitalidad se ha agotado. El libro te incorpora como una página más.";
-    }
-
+    if (els.resultTitle) els.resultTitle.textContent = victory ? "Página recuperada" : "El grimorio te reclama";
+    if (els.resultText) els.resultText.textContent = victory
+      ? "Has sobrevivido al ritual y has recuperado una página perdida del grimorio."
+      : "Tu vitalidad se ha agotado. El libro te incorpora como una página más.";
     els.result.hidden = false;
   }
-
   function checkResult() {
     if (!state) return;
     if (getEnemyHp() <= 0) { showResult(true); return; }
     if (getPlayerHp() <= 0) showResult(false);
   }
 
-  /* ==========================================================================
-     RENDER GENERAL
-     ========================================================================== */
+  /* ==================== RENDER ==================== */
+  function renderAll() { renderHUD(); renderDeckStatus(); renderHand(); }
 
-  function renderAll() {
-    renderHUD();
-    renderDeckStatus();
-    renderHand();
-  }
-
-  /* ==========================================================================
-     INICIO / REINICIO
-     ========================================================================== */
-
-  function startGame() {
-    try {
-      hideContinueOverlay();
-      pendingLoadedState = null;
-      state = createGameState();
-      started = true;
-      if (els.intro) els.intro.hidden = true;
-      if (els.result) els.result.hidden = true;
-      closeInspect();
-      closeDeckOverlay();
-      resetSensorNeutral();
-      renderAll();
-      setMessage("El grimorio se abre. Recupera las páginas perdidas.");
-    } catch (error) {
-      console.error(error);
-      setMessage(`Error: ${error.message}`);
-    }
-  }
-
-  function restartGame() {
-    startGame();
-  }
-
-  /* ==========================================================================
-     EVENTOS GLOBALES
-     ========================================================================== */
-
+  /* ==================== EVENTOS GLOBALES ==================== */
   function bindGlobalEvents() {
-    els.start?.addEventListener("click", startGame);
-    els.restart?.addEventListener("click", restartGame);
+    els.start?.addEventListener("click", handleNewRunClick);
+    els.continueGame?.addEventListener("click", () => {
+      const loaded = peekSave();
+      if (loaded) { pendingLoadedState = loaded; continueFromSave(); }
+      else { refreshContinueButton(); }
+    });
+    els.openHistory?.addEventListener("click", () => openSubScreen(els.historyScreen));
+    els.openSettings?.addEventListener("click", () => openSubScreen(els.settingsScreen));
+    els.openLore?.addEventListener("click", () => openSubScreen(els.loreScreen));
+    els.closeHistory?.addEventListener("click", () => { if (els.historyScreen) els.historyScreen.hidden = true; });
+    els.closeSettings?.addEventListener("click", () => { if (els.settingsScreen) els.settingsScreen.hidden = true; });
+    els.closeLore?.addEventListener("click", () => { if (els.loreScreen) els.loreScreen.hidden = true; });
+    els.restart?.addEventListener("click", showMenu);
     els.endTurn?.addEventListener("click", endTurn);
     els.closeInspect?.addEventListener("click", closeInspect);
-
-    els.inspect?.addEventListener("click", (event) => {
-      if (event.target === els.inspect) closeInspect();
-    });
-
+    els.inspect?.addEventListener("click", (e) => { if (e.target === els.inspect) closeInspect(); });
     els.openGrimoire?.addEventListener("click", () => openDeckOverlay("grimoire"));
     els.openAshes?.addEventListener("click", () => openDeckOverlay("ashes"));
     els.closeDeck?.addEventListener("click", closeDeckOverlay);
     els.deckCloseBottom?.addEventListener("click", closeDeckOverlay);
-
-    els.deckOverlay?.addEventListener("click", (event) => {
-      if (event.target === els.deckOverlay) closeDeckOverlay();
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        closeInspect();
-        closeDeckOverlay();
-      }
+    els.deckOverlay?.addEventListener("click", (e) => { if (e.target === els.deckOverlay) closeDeckOverlay(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { closeInspect(); closeDeckOverlay(); hideAllSubScreens(); }
     });
   }
 
-  /* ==========================================================================
-     INIT
-     ========================================================================== */
-
+  /* ==================== INIT ==================== */
   function init() {
     bindGlobalEvents();
     initLookEffects();
-    setMessage("Pulsa “Abrir el Grimorio” para comenzar.");
-
-    const loaded = peekSave();
-    if (loaded) {
-      pendingLoadedState = loaded;
-      showContinueOverlay();
-    }
+    try {
+      if (!localStorage.getItem(FIRST_TIME_KEY)) {
+        localStorage.setItem(FIRST_TIME_KEY, "1");
+      }
+    } catch (e) { /* almacenamiento no disponible */ }
+    showMenu();
   }
-
   init();
 })();
