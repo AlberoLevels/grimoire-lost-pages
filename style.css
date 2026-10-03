@@ -12,6 +12,11 @@
    + M1-HUB fix: pantalla completa + transición esfera
    + M1-HUB logo: degradado oro→violeta con glow
    + FIX MÓVIL: quitar resaltado azul nativo al tocar botones
+   + M2: AJUSTES REALES (reducir movimiento, modo OLED, borrar progreso)
+   + G0: LECTURA DE COMBATE (barra de vida enemiga + contador de turno)
+   + G0.5: COHERENCIA JUGADOR/ENEMIGO (barra de vida del jugador + paridad de glow)
+   + G0.6: TOKENS DE VIDA UNIFICADOS + SCROLL DE MANO COHERENTE
+   + G1: SLIDERS DE AUDIO (Música / Efectos) en Ajustes
    Móvil vertical + PC horizontal
    ========================================================================== */
 
@@ -39,6 +44,10 @@
   --blood: #ef4444;
   --blood-deep: #7f1d1d;
   --blood-glow: rgba(239, 68, 68, 0.25);
+
+  /* G0.6: rótulos de vida unificados (jugador y enemigo, gemelos exactos) */
+  --life-label: #fecdd3;
+  --life-label-glow: rgba(244, 63, 94, 0.22);
 
   --heal: #22c55e;
   --heal-deep: #14532d;
@@ -244,13 +253,14 @@ h3,
   text-align: right;
 }
 
+/* G0.6: el nombre del enemigo usa el token de vida unificado. */
 .enemy-name {
   margin: 0;
   font-family: var(--font-title);
   font-size: clamp(0.82rem, 2.4vw, 1.25rem);
   line-height: 1.1;
-  color: #fecdd3;
-  text-shadow: 0 0 14px rgba(244, 63, 94, 0.22);
+  color: var(--life-label);
+  text-shadow: 0 0 14px var(--life-label-glow);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2283,6 +2293,7 @@ h3,
     animation: none !important;
   }
 }
+
 /* ==========================================================================
    M2: AJUSTES REALES (reducir movimiento, modo OLED, borrar progreso)
    ========================================================================== */
@@ -2429,4 +2440,171 @@ html.app-oled .hud-panel,
 html.app-oled .page-card,
 html.app-oled .deck-counter {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* ==========================================================================
+   G0 / G0.5: LECTURA DE COMBATE Y COHERENCIA JUGADOR/ENEMIGO
+   Barras de vida compartidas (jugador + enemigo) + contador de turno.
+   ========================================================================== */
+
+.hp-bar {
+  height: 0.35rem;
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(2, 6, 23, 0.7);
+  overflow: hidden;
+}
+
+.hp-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blood-deep), var(--blood));
+  box-shadow: 0 0 8px var(--blood-glow);
+  transition: width 260ms ease;
+}
+
+/* G0.5 / G0.6: paridad tonal unificada vía tokens. La etiqueta de vida del
+   jugador y el nombre del enemigo son gemelos exactos (--life-label).
+   La etiqueta de recurso (Tinta Arcana) sigue dorada: es otra familia. */
+.player-panel .panel-label {
+  color: var(--life-label);
+  text-shadow: 0 0 14px var(--life-label-glow);
+}
+
+.turn-label {
+  position: absolute;
+  top: clamp(0.5rem, 2vh, 0.9rem);
+  left: clamp(0.6rem, 2vw, 1rem);
+  z-index: 2;
+  font-family: var(--font-title);
+  font-size: clamp(0.6rem, 1.8vw, 0.8rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+/* En portrait el panel enemigo es grid de 2 columnas: su barra ocupa el ancho
+   completo. El panel del jugador es bloque normal: su barra ya es full-width. */
+@media (orientation: portrait) {
+  .enemy-panel .hp-bar {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ==========================================================================
+   G0.6: SCROLL DE MANO COHERENTE (misma lengua visual que Grimorio/Cenizas)
+   ========================================================================== */
+
+.hand::-webkit-scrollbar {
+  height: 0.4rem;
+}
+
+.hand::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.4);
+  border-radius: 999px;
+}
+
+.hand::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, var(--gold-soft), rgba(168, 85, 247, 0.6));
+  border-radius: 999px;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.hand::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, var(--gold), var(--purple-light));
+}
+
+.hand {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-soft) rgba(2, 6, 23, 0.4);
+}
+
+/* ==========================================================================
+   G1: SLIDERS DE AUDIO (Música / Efectos) en Ajustes
+   Misma lengua visual que los switches: pista oscura con borde oro y
+   pulgar circular dorado con glow. Foco visible accesible.
+   ========================================================================== */
+
+.setting-row-slider {
+  gap: 0.9rem;
+}
+
+.setting-slider {
+  flex: 0 0 auto;
+  width: 8rem;
+  height: 1.5rem;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.setting-slider:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+
+/* Pista (track) */
+.setting-slider::-webkit-slider-runnable-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.setting-slider::-moz-range-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Pulgar (thumb) */
+.setting-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: -0.4rem; /* centra el pulgar sobre la pista */
+  border-radius: 50%;
+  background: var(--gold);
+  border: 1px solid rgba(251, 191, 36, 0.8);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+  transition: box-shadow 140ms ease, transform 120ms ease;
+}
+
+.setting-slider::-moz-range-thumb {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 1px solid rgba(251, 191, 36, 0.8);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+  transition: box-shadow 140ms ease, transform 120ms ease;
+}
+
+.setting-slider:hover::-webkit-slider-thumb,
+.setting-slider:active::-webkit-slider-thumb {
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.6);
+  transform: scale(1.06);
+}
+
+.setting-slider:hover::-moz-range-thumb,
+.setting-slider:active::-moz-range-thumb {
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.6);
+  transform: scale(1.06);
+}
+
+/* En móvil, el slider se estrecha un poco para que la fila quepa sin apretar. */
+@media (orientation: portrait) {
+  .setting-slider {
+    width: 6.5rem;
+  }
 }
