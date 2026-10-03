@@ -4,7 +4,7 @@
    v30: actualización de assets y mejoras en el manejo de caché.
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v33";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v34";
 
 const CORE_ASSETS = [
   "./",
