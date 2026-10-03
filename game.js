@@ -52,7 +52,7 @@
 
   let state = null;
   let started = false;
-  let currentScreen = "menu"; // "menu" | "combat"
+  let currentScreen = "menu";
   let longPressTimer = null;
   let activeCardElement = null;
   let pressStartedAt = 0;
@@ -65,16 +65,65 @@
 
   const SAVE_KEY = "grimoire-save";
   const FIRST_TIME_KEY = "grimoire-first-time";
+  const SETTINGS_KEY = "grimoire-settings";
+  const HISTORY_KEY = "grimoire-history"; // reservada para M3 (Cronología)
+
   let pendingLoadedState = null;
   let saveToastEl = null;
   let saveToastTimer = null;
 
-  /* ==================== EFECTO AMBIENTAL: MIRADA ARCANA ==================== */
-  const prefersReducedMotion =
+  /* ==================== AJUSTES (M2) ==================== */
+
+  const systemReduceMotion =
     window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  function loadSettings() {
+    // Defaults: el toggle de movimiento nace reflejando al sistema (decisión M2).
+    const defaults = { reduceMotion: systemReduceMotion, oled: false };
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return defaults;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return defaults;
+      return {
+        reduceMotion: parsed.reduceMotion === true,
+        oled: parsed.oled === true
+      };
+    } catch (e) {
+      return defaults;
+    }
+  }
+
+  let settings = loadSettings();
+
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+
+  // Estado EFECTIVO de reducción: sistema O elección del usuario.
+  function isMotionReduced() {
+    return systemReduceMotion || settings.reduceMotion === true;
+  }
+
+  function applySettingsToDOM() {
+    const root = document.documentElement;
+    root.classList.toggle("app-reduce-motion", isMotionReduced());
+    root.classList.toggle("app-oled", settings.oled === true);
+    look.enabled = !isMotionReduced();
+    if (isMotionReduced()) {
+      const container = document.getElementById("artifact-particles");
+      if (container) container.innerHTML = "";
+      const wrapper = document.querySelector(".arcane-orb-wrapper");
+      if (wrapper) wrapper.style.transform = "";
+      menuTargetX = 0; menuTargetY = 0;
+      menuCurrentX = 0; menuCurrentY = 0;
+    }
+  }
+
+  /* ==================== EFECTO AMBIENTAL: MIRADA ARCANA ==================== */
+
   const look = {
-    enabled: !prefersReducedMotion, sensorActive: false,
+    enabled: !isMotionReduced(), sensorActive: false,
     neutralBeta: null, neutralGamma: null,
     maxMove: 10, runeRatio: 0.55, ease: 0.08,
     targetX: 0, targetY: 0, currentX: 0, currentY: 0,
@@ -408,23 +457,17 @@
   }
   function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
   function persistAfterAction() { if (isResultVisible()) clearSave(); else saveGame(); }
-  function showToast() {
-    if (!saveToastEl) { saveToastEl = document.createElement("div"); saveToastEl.className = "save-toast"; saveToastEl.setAttribute("role","status"); saveToastEl.setAttribute("aria-live","polite"); saveToastEl.textContent = "Progreso guardado"; document.body.appendChild(saveToastEl); }
+  function showToast(text = "Progreso guardado") {
+    if (!saveToastEl) { saveToastEl = document.createElement("div"); saveToastEl.className = "save-toast"; saveToastEl.setAttribute("role","status"); saveToastEl.setAttribute("aria-live","polite"); document.body.appendChild(saveToastEl); }
+    saveToastEl.textContent = text;
     saveToastEl.classList.add("is-visible"); clearTimeout(saveToastTimer);
     saveToastTimer = setTimeout(() => { if (saveToastEl) saveToastEl.classList.remove("is-visible"); }, 1200);
   }
 
   /* ==================== M1: NAVEGACIÓN ==================== */
+  function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+  function refreshContinueButton() { if (els.continueGame) els.continueGame.hidden = !hasSave(); }
 
-  function hasSave() {
-    try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
-  }
-
-  function refreshContinueButton() {
-    if (els.continueGame) els.continueGame.hidden = !hasSave();
-  }
-
-  // M1-HUB (fix): el menú llena la pantalla y entra con animación.
   function showMenu() {
     currentScreen = "menu";
     started = false;
@@ -436,9 +479,9 @@
     if (els.intro) {
       els.intro.hidden = false;
       els.intro.classList.remove("menu-hub--leaving");
-      if (!prefersReducedMotion) {
+      if (!isMotionReduced()) {
         els.intro.classList.remove("menu-hub--entering");
-        void els.intro.offsetWidth; // reflow: reinicia la animación si ya estaba puesta
+        void els.intro.offsetWidth;
         els.intro.classList.add("menu-hub--entering");
       }
     }
@@ -446,21 +489,19 @@
     setMenuVisualMode(true);
   }
 
-  // M1-HUB (fix): al entrar en combate, la esfera hace zoom-in + fundido antes de ocultarse.
   function showCombat() {
     currentScreen = "combat";
     hideAllSubScreens();
     if (els.result) els.result.hidden = true;
-    setMenuVisualMode(false); // para RAF/listeners/partículas de inmediato
+    setMenuVisualMode(false);
     if (els.intro) {
-      if (prefersReducedMotion) {
+      if (isMotionReduced()) {
         els.intro.hidden = true;
         els.intro.classList.remove("menu-hub--entering", "menu-hub--leaving");
       } else {
         els.intro.classList.remove("menu-hub--entering");
         els.intro.classList.add("menu-hub--leaving");
         setTimeout(() => {
-          // Solo oculta si seguimos en combate (guard lightweight anti-solape).
           if (currentScreen === "combat" && els.intro) {
             els.intro.hidden = true;
             els.intro.classList.remove("menu-hub--leaving");
@@ -480,6 +521,7 @@
     if (!el) return;
     hideAllSubScreens();
     el.hidden = false;
+    if (el === els.settingsScreen) syncSettingsUI();
   }
 
   function showConfirmDiscard(onYes) {
@@ -545,8 +587,99 @@
   }
   function hideContinueOverlay() { const el = document.getElementById("continue-overlay"); if (el) el.remove(); }
 
-  /* ==================== M1-HUB: LÓGICA DE ÓRBITA Y PARTÍCULAS ==================== */
+  /* ==================== M2: UI DE AJUSTES ==================== */
+  function buildSettingsUI() {
+    const card = els.settingsScreen ? els.settingsScreen.querySelector(".overlay-card") : null;
+    if (!card) return;
+    const placeholder = card.querySelector(".subscreen-placeholder");
+    if (placeholder) placeholder.remove();
 
+    const body = document.createElement("div");
+    body.className = "settings-body";
+    body.innerHTML = `
+      <label class="setting-row">
+        <span class="setting-text">
+          <span class="setting-name">Reducir movimiento</span>
+          <span class="setting-desc">Apaga el aleteo del libro: giros, pulsos y transiciones.</span>
+        </span>
+        <input type="checkbox" id="setting-reduce-motion" class="setting-toggle">
+        <span class="setting-switch" aria-hidden="true"></span>
+      </label>
+      <label class="setting-row">
+        <span class="setting-text">
+          <span class="setting-name">Modo OLED</span>
+          <span class="setting-desc">Negro vivo y brillos contenidos para pantallas AMOLED.</span>
+        </span>
+        <input type="checkbox" id="setting-oled" class="setting-toggle">
+        <span class="setting-switch" aria-hidden="true"></span>
+      </label>
+      <button id="setting-wipe" class="ritual-button danger-button" type="button">Borrar progreso</button>
+    `;
+
+    if (els.closeSettings) card.insertBefore(body, els.closeSettings);
+    else card.appendChild(body);
+
+    body.querySelector("#setting-reduce-motion").addEventListener("change", (e) => {
+      settings.reduceMotion = e.target.checked === true;
+      saveSettings();
+      applySettingsToDOM();
+    });
+    body.querySelector("#setting-oled").addEventListener("change", (e) => {
+      settings.oled = e.target.checked === true;
+      saveSettings();
+      applySettingsToDOM();
+    });
+    body.querySelector("#setting-wipe").addEventListener("click", showWipeConfirm);
+  }
+
+  function syncSettingsUI() {
+    const rm = document.getElementById("setting-reduce-motion");
+    const ol = document.getElementById("setting-oled");
+    // El toggle de movimiento muestra el estado EFECTIVO (sistema o app).
+    if (rm) rm.checked = isMotionReduced();
+    if (ol) ol.checked = settings.oled === true;
+  }
+
+  function showWipeConfirm() {
+    if (document.getElementById("wipe-confirm-overlay")) return;
+    const ov = document.createElement("div");
+    ov.id = "wipe-confirm-overlay";
+    ov.className = "overlay";
+    ov.setAttribute("role", "dialog");
+    ov.setAttribute("aria-modal", "true");
+    ov.innerHTML = `
+      <div class="overlay-card">
+        <h2>¿Borrar todo el progreso?</h2>
+        <p>Se perderán la partida guardada, la cronología, los ajustes y el recuerdo de tu primera apertura. El libro volverá a estar en blanco.</p>
+        <div class="continue-actions">
+          <button id="wipe-yes" class="ritual-button danger-button" type="button">Borrar todo</button>
+          <button id="wipe-no" class="ritual-button secondary-button" type="button">Volver</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(ov);
+    ov.querySelector("#wipe-yes").addEventListener("click", () => { ov.remove(); wipeAllProgress(); });
+    ov.querySelector("#wipe-no").addEventListener("click", () => ov.remove());
+  }
+
+  function wipeAllProgress() {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(HISTORY_KEY);
+      localStorage.removeItem(SETTINGS_KEY);
+      localStorage.removeItem(FIRST_TIME_KEY);
+    } catch (e) {}
+    settings = { reduceMotion: false, oled: false };
+    applySettingsToDOM();
+    pendingLoadedState = null;
+    state = null;
+    started = false;
+    syncSettingsUI();
+    showMenu();
+    showToast("Progreso borrado");
+  }
+
+  /* ==================== M1-HUB: ÓRBITA Y PARTÍCULAS ==================== */
   let menuOrbitActive = false;
   let menuTargetX = 0;
   let menuTargetY = 0;
@@ -556,52 +689,44 @@
   const MENU_MAX_MOVE = 12;
 
   function updateMenuOrbitTargets(nx, ny) {
-    if (!menuOrbitActive || prefersReducedMotion) return;
+    if (!menuOrbitActive || isMotionReduced()) return;
     const x = clampValue(nx, -1, 1);
     const y = clampValue(ny, -1, 1);
     menuTargetX = x * MENU_MAX_MOVE;
     menuTargetY = y * MENU_MAX_MOVE;
   }
-
   function onMenuPointerMove(event) {
     if (!menuOrbitActive) return;
     const w = window.innerWidth || 1;
     const h = window.innerHeight || 1;
-    const nx = (event.clientX / w - 0.5) * 2;
-    const ny = (event.clientY / h - 0.5) * 2;
-    updateMenuOrbitTargets(nx, ny);
+    updateMenuOrbitTargets((event.clientX / w - 0.5) * 2, (event.clientY / h - 0.5) * 2);
   }
-
   function onMenuDeviceOrientation(event) {
-    if (!menuOrbitActive || prefersReducedMotion) return;
+    if (!menuOrbitActive || isMotionReduced()) return;
     const hasBeta = typeof event.beta === "number" && Number.isFinite(event.beta);
     const hasGamma = typeof event.gamma === "number" && Number.isFinite(event.gamma);
     if (!hasBeta || !hasGamma) return;
-    const gammaNorm = clampValue(event.gamma / 45, -1, 1);
-    const betaNorm = clampValue((event.beta - 45) / 45, -1, 1);
-    updateMenuOrbitTargets(gammaNorm, betaNorm);
+    updateMenuOrbitTargets(
+      clampValue(event.gamma / 45, -1, 1),
+      clampValue((event.beta - 45) / 45, -1, 1)
+    );
   }
-
   function animateMenuOrbit() {
     if (!menuOrbitActive) return;
     menuCurrentX += (menuTargetX - menuCurrentX) * MENU_EASE;
     menuCurrentY += (menuTargetY - menuCurrentY) * MENU_EASE;
     const wrapper = document.querySelector(".arcane-orb-wrapper");
-    if (wrapper) {
-      wrapper.style.transform = `translate3d(${menuCurrentX.toFixed(2)}px, ${menuCurrentY.toFixed(2)}px, 0)`;
-    }
+    if (wrapper) wrapper.style.transform = `translate3d(${menuCurrentX.toFixed(2)}px, ${menuCurrentY.toFixed(2)}px, 0)`;
     requestAnimationFrame(animateMenuOrbit);
   }
-
   function spawnMenuParticles() {
     const container = document.getElementById("artifact-particles");
-    if (!container || prefersReducedMotion) return;
+    if (!container || isMotionReduced()) return;
     for (let i = 0; i < 15; i++) createParticle(container);
     setInterval(() => {
       if (menuOrbitActive && container.children.length < 20) createParticle(container);
     }, 2000);
   }
-
   function createParticle(container) {
     const p = document.createElement("div");
     const size = Math.random() * 3 + 1;
@@ -627,7 +752,6 @@
     ], { duration: duration, easing: "ease-out", fill: "forwards" });
     anim.onfinish = () => p.remove();
   }
-
   function setMenuVisualMode(active) {
     menuOrbitActive = active;
     if (active) {
@@ -719,11 +843,13 @@
   function init() {
     bindGlobalEvents();
     initLookEffects();
+    applySettingsToDOM();
+    buildSettingsUI();
     try {
       if (!localStorage.getItem(FIRST_TIME_KEY)) {
         localStorage.setItem(FIRST_TIME_KEY, "1");
       }
-    } catch (e) { /* almacenamiento no disponible */ }
+    } catch (e) {}
     showMenu();
   }
   init();
