@@ -135,6 +135,9 @@ const ENEMIES = [
   }
 ];
 
+// G0.6: tope de mano (estándar del género). Exceso va a cenizas, no a limbo.
+const HAND_MAX = 10;
+
 // Versión del formato de guardado.
 // v3: cartas con effects/keywords, limboPile (exhaust), mazo inicial nuevo.
 const SAVE_VERSION = 3;
@@ -320,8 +323,31 @@ class GameState {
     console.log(`LOGIC RPG: Turno ${this.turnCount}. Mano: ${this.hand.length}.`);
   }
 
+  // G0.6: robos con tope de mano. El exceso va a cenizas (discardPile), no a limbo.
+  // Devuelve cuántas cartas se perdieron por tener la mano llena.
   drawCards(amount) {
+    let lost = 0;
     for (let i = 0; i < amount; i++) {
+      // G0.6: si la mano ya está al tope, el exceso va directo a cenizas.
+      if (this.hand.length >= HAND_MAX) {
+        if (this.drawPile.length === 0) {
+          if (this.discardPile.length === 0) break;
+          this.drawPile = this.discardPile.map((c) => c);
+          this.discardPile = [];
+          this.shuffle();
+          const innate = this.drawPile.filter((c) => c.innate);
+          const rest = this.drawPile.filter((c) => !c.innate);
+          this.drawPile = [...rest, ...innate];
+        }
+        const card = this.drawPile.pop();
+        if (card) {
+          this.discardPile.push(card);
+          lost++;
+        }
+        continue;
+      }
+
+      // Robo normal: hay sitio en mano.
       if (this.drawPile.length === 0) {
         if (this.discardPile.length === 0) break;
         this.drawPile = this.discardPile.map((c) => c);
@@ -335,6 +361,7 @@ class GameState {
       const card = this.drawPile.pop();
       if (card) this.hand.push(card);
     }
+    return lost;
   }
 
   playCard(index) {
