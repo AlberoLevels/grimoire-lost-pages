@@ -443,21 +443,29 @@ Implicaciones directas:
 
 Principio operativo: cada decisión técnica o artística debe responder a *"¿esto acerca el juego a un producto terminable y vendible?"*. Si la respuesta es no, se reconsidera antes de implementar.
 
-18. Principios de Producción Profesional
+## 18. Principios de Producción Profesional
+
 El proyecto se construye, desde el primer día, con calidad de producto comercializable, aunque su destino inmediato sea personal. El objetivo es que, si algún día se decide vender, no haya que reescribir cimientos: solo añadir lo que exclusivamente importa cuando hay comercio.
+
 Regla rectora: construir como si fuera a venderse mañana, pero sin gastar esfuerzo en lo que solo importa cuando se vende.
-Lo que se hace a nivel profesional YA (barato, evita reescribir)
-Textos jugables en datos, nunca en funciones. Nombres de cartas, descripciones, nombres de enemigos y mensajes viven en estructuras de datos (CARDS, ENEMIES, bloques de texto), no hardcodeados dentro de la lógica. Razón: el día que se quiera otro idioma, los strings se extraen a archivos de localización sin tocar el motor. No se implementa i18n ahora, pero se deja la puerta abierta manteniendo los textos en datos.
-Cero números mágicos sueltos. Vida inicial, daño base, costes, umbrales de corrupción y probabilidades viven como constantes con nombre o en un bloque de balance al principio del archivo. Razón: ajustar dificultad o responder a feedback de prueba es cambiar una constante, no cazar un valor perdido entre cientos de líneas.
-Assets fuera del código, con rutas estables. Las ilustraciones viven en carpetas por tipo (assets/cards/, assets/enemies/, etc.) y se referencian por id estable, nunca embebidas ni con rutas que cambien. Razón: permite DLC, skins o sustitución de arte sin tocar lógica.
-Control de versiones con commits atómicos y mensajes claros. Una funcionalidad por commit, mensaje descriptivo, nada de actualizaciones genéricas. Razón: historial legible para revertir, auditar o mostrar a un editor.
-Licencias y derechos verificados antes de usar. Cualquier fuente, asset o herramienta de IA generativa usada debe permitir uso comercial según su licencia. Se comprueba antes de integrar, no el día de publicar. Razón: evita retiradas legales cuando haya dinero de por medio.
-Accesibilidad tratada como requisito, no como adorno. Respeto a movimiento reducido, foco visible, alternativas no cromáticas a la información (glifo más texto, no solo color) y modo de alto contraste. Razón: amplía audiencia y es valorado en plataformas de distribución.
-Lo que NO se hace ahora (se deja al momento comercial, es caro)
-Multiplataforma más allá de Android/iOS vía Capacitor. Steam, consolas u otras tiendas se evalúan solo cuando exista oferta real.
-Backend, cuentas en la nube, guardado remoto, rankings o logros de plataforma. La memoria es local mientras no haya motivo de negocio.
-DRM, anti-piratería o autenticación. Juego offline; las plataformas ya aportan su capa el día de vender.
-Analíticas o telemetría. Ruido y riesgo de privacidad en un juego personal; solo con consentimiento explícito si algún día se comercializa.
-Pipeline automatizado de builds. Innecesario para desarrollo individual; se monta si hay equipo.
-Principio operativo
+
+### Lo que se hace a nivel profesional YA (barato, evita reescribir)
+
+- Textos jugables en datos, nunca en funciones. Nombres de cartas, descripciones, nombres de enemigos y mensajes viven en estructuras de datos (CARDS, ENEMIES, bloques de texto), no hardcodeados dentro de la lógica. Razón: el día que se quiera otro idioma, los strings se extraen a archivos de localización sin tocar el motor. No se implementa i18n ahora, pero se deja la puerta abierta manteniendo los textos en datos.
+- Cero números mágicos sueltos. Vida inicial, daño base, costes, umbrales de corrupción y probabilidades viven como constantes con nombre o en un bloque de balance al principio del archivo. Razón: ajustar dificultad o responder a feedback de prueba es cambiar una constante, no cazar un valor perdido entre cientos de líneas.
+- Assets fuera del código, con rutas estables. Las ilustraciones viven en carpetas por tipo (assets/cards/, assets/enemies/, etc.) y se referencian por id estable, nunca embebidas ni con rutas que cambien. Razón: permite DLC, skins o sustitución de arte sin tocar lógica.
+- Control de versiones con commits atómicos y mensajes claros. Una funcionalidad por commit, mensaje descriptivo, nada de actualizaciones genéricas. Razón: historial legible para revertir, auditar o mostrar a un editor.
+- Licencias y derechos verificados antes de usar. Cualquier fuente, asset o herramienta de IA generativa usada debe permitir uso comercial según su licencia. Se comprueba antes de integrar, no el día de publicar. Razón: evita retiradas legales cuando haya dinero de por medio.
+- Accesibilidad tratada como requisito, no como adorno. Respeto a movimiento reducido, foco visible, alternativas no cromáticas a la información (glifo más texto, no solo color) y modo de alto contraste. Razón: amplía audiencia y es valorado en plataformas de distribución.
+
+### Lo que NO se hace ahora (se deja al momento comercial, es caro)
+
+- Multiplataforma más allá de Android/iOS vía Capacitor. Steam, consolas u otras tiendas se evalúan solo cuando exista oferta real.
+- Backend, cuentas en la nube, guardado remoto, rankings o logros de plataforma. La memoria es local mientras no haya motivo de negocio.
+- DRM, anti-piratería o autenticación. Juego offline; las plataformas ya aportan su capa el día de vender.
+- Analíticas o telemetría. Ruido y riesgo de privacidad en un juego personal; solo con consentimiento explícito si algún día se comercializa.
+- Pipeline automatizado de builds. Innecesario para desarrollo individual; se monta si hay equipo.
+
+### Principio operativo
+
 Cada decisión técnica debe pasar dos filtros. Primero: esto acerca el juego a un producto terminable y vendible. Segundo: esto cuesta ahora o costará reescribir después. Si una práctica es barata hoy y evita reescribir mañana, se adopta ya. Si es cara hoy y solo importa cuando haya comercio, se pospone. El equilibrio entre ambos filtros es lo que mantiene el proyecto profesional sin paralizarlo.
