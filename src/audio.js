@@ -4,8 +4,12 @@
    Expone window.AudioFX. No depende de game.js (capa de presentación pura).
    Reglas: desbloqueo por gesto, pausa en segundo plano, volúmenes externos.
    Música: crossfade entre music_menu y music_combat según intensidad.
-   G1-fix: calentamiento del AudioContext + retraso + fade-in para evitar
-   el crackle de la primera apertura en móvil.
+   G1-fix (endurecido móvil):
+     - Calentamiento del AudioContext con buffer de silencio.
+     - Retraso de estabilización (80 ms) antes de arrancar la música.
+     - Fade-in suave (0.55 s) en vez de arranque a volumen pleno.
+     - Arranque de fuente programado 30 ms en el futuro (evita el click de start).
+     - Solo se arranca la pista activa; la otra se crea en silencio al pedir crossfade.
    ========================================================================== */
 
 (() => {
@@ -37,7 +41,7 @@
   let sfxGain = null;
   const buffers = {};
 
-  // Nodos de música (dos fuentes en loop permanente, crossfade por gain).
+  // Nodos de música (dos fuentes en loop, crossfade por gain).
   let musicMenuSource = null;
   let musicCombatSource = null;
   let musicMenuGainNode = null;
@@ -48,10 +52,9 @@
   // Estado de mezcla (lo fija game.js desde los ajustes persistidos).
   const mix = { music: 0.7, sfx: 0.9, muted: false, intensity: "menu" };
 
-  // G1-fix: duración del fade-in de arranque de la música.
-  const MUSIC_FADE_IN = 0.4;
-  // G1-fix: retraso para que el hilo de audio se estabilice tras el resume.
-  const AUDIO_WARMUP_DELAY = 50;
+  // G1-fix endurecido: fade-in de arranque y retraso de estabilización.
+  const MUSIC_FADE_IN = 0.55;
+  const AUDIO_WARMUP_DELAY = 80;
 
   function supported() {
     return typeof window !== "undefined" &&
@@ -110,66 +113,119 @@
     }
   }
 
-  /* ==================== MÚSICA: ARRANQUE Y CROSSFADE ==================== */
+  /* ==================== MÚSICA: ARRANQUE Y CROSSFADE (ENDURECIDO MÓVIL) ==================== */
 
-  function startMusicNodes() {
-    if (musicStarted || !ctx) return;
-    if (!buffers.music_menu || !buffers.music_combat) return;
+  function ensureMusicGainNodes() {
+    if (!ctx) return false;
 
-    musicMenuGainNode = ctx.createGain();
-    musicCombatGainNode = ctx.createGain();
-    musicMenuGainNode.connect(musicGain);
-    musicCombatGainNode.connect(musicGain);
-
-    musicMenuSource = ctx.createBufferSource();
-    musicMenuSource.buffer = buffers.music_menu;
-    musicMenuSource.loop = true;
-    musicMenuSource.connect(musicMenuGainNode);
-
-    musicCombatSource = ctx.createBufferSource();
-    musicCombatSource.buffer = buffers.music_combat;
-    musicCombatSource.loop = true;
-    musicCombatSource.connect(musicCombatGainNode);
-
-    // G1-fix: fade-in de arranque en vez de entrar a volumen pleno de golpe.
-    const t = ctx.currentTime;
-    musicMenuGainNode.gain.setValueAtTime(0, t);
-    musicCombatGainNode.gain.setValueAtTime(0, t);
-    if (mix.intensity === "combat") {
-      musicCombatGainNode.gain.linearRampToValueAtTime(1, t + MUSIC_FADE_IN);
-    } else {
-      musicMenuGainNode.gain.linearRampToValueAtTime(1, t + MUSIC_FADE_IN);
+    if (!musicMenuGainNode) {
+      musicMenuGainNode = ctx.createGain();
+      musicMenuGainNode.connect(musicGain);
     }
 
-    musicMenuSource.start(0);
-    musicCombatSource.start(0);
-    musicStarted = true;
+    if (!musicCombatGainNode) {
+      musicCombatGainNode = ctx.createGain();
+      musicCombatGainNode.connect(musicGain);
+    }
+
+    return true;
   }
 
-  // G1-fix: calentamiento + retraso + arranque, en un solo flujo.
+  function startMusicSource(which, targetVolume, fadeDuration) {
+    if (!ensureMusicGainNodes()) return;
+
+    const isMenu = which === "menu";
+
+    // Si esa fuente ya existe, no la duplicamos.
+    if (isMenu && musicMenuSource) return;
+    if (!isMenu && musicCombatSource) return;
+
+    const buffer = buffers[isMenu ? "music_menu" : "music_combat"];
+    if (!buffer) return;
+
+    const gainNode = isMenu ? musicMenuGainNode : musicCombatGainNode;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gainNode);
+
+    const t = ctx.currentTime;
+
+    // Arrancamos siempre en silencio y subimos con fade si procede.
+    gainNode.gain.cancelScheduledValues(t);
+    gainNode.gain.setValueAtTime(0, t);
+
+    if (fadeDuration > 0) {
+      gainNode.gain.linearRampToValueAtTime(targetVolume, t + fadeDuration);
+    } else {
+      gainNode.gain.setValueAtTime(targetVolume, t);
+    }
+
+    // Truco clave en móvil: no start(0) inmediato.
+    // Programamos el arranque unos ms en el futuro para evitar el click inicial.
+    source.start(t + 0.03);
+
+    if (isMenu) {
+      musicMenuSource = source;
+    } else {
+      musicCombatSource = source;
+    }
+  }
+
   function startMusicFlow() {
     if (musicStarted || !ctx) return;
     if (!buffers.music_menu || !buffers.music_combat) return;
+
+    // Calienta el hilo de audio con silencio.
     warmUpContext();
+
     setTimeout(() => {
-      startMusicNodes();
+      if (!ctx || ctx.state !== "running") return;
+
+      // Solo arranca la pista activa. La otra se creará en silencio cuando haga falta.
+      const active = mix.intensity === "combat" ? "combat" : "menu";
+      startMusicSource(active, 1, MUSIC_FADE_IN);
+
+      musicStarted = true;
     }, AUDIO_WARMUP_DELAY);
   }
 
   function setIntensity(mode) {
     mix.intensity = mode === "combat" ? "combat" : "menu";
+
     if (!ctx || ctx.state !== "running" || !musicStarted) return;
+    if (!ensureMusicGainNodes()) return;
+
+    const target = mix.intensity === "combat" ? "combat" : "menu";
+    const other = target === "combat" ? "menu" : "combat";
+
+    // Si la otra pista aún no existe, créala en silencio para poder hacer crossfade.
+    if (other === "menu" && !musicMenuSource) {
+      startMusicSource("menu", 0, 0);
+    }
+
+    if (other === "combat" && !musicCombatSource) {
+      startMusicSource("combat", 0, 0);
+    }
+
     if (!musicMenuGainNode || !musicCombatGainNode) return;
+
     const t = ctx.currentTime;
-    // Anclar valores actuales para un crossfade suave desde el punto actual.
+
+    // Anclamos el valor actual antes del fundido para evitar saltos.
     const currentMenu = musicMenuGainNode.gain.value;
     const currentCombat = musicCombatGainNode.gain.value;
+
     musicMenuGainNode.gain.cancelScheduledValues(t);
     musicCombatGainNode.gain.cancelScheduledValues(t);
+
     musicMenuGainNode.gain.setValueAtTime(currentMenu, t);
     musicCombatGainNode.gain.setValueAtTime(currentCombat, t);
-    const menuTarget = mix.intensity === "menu" ? 1 : 0;
-    const combatTarget = mix.intensity === "combat" ? 1 : 0;
+
+    const menuTarget = target === "menu" ? 1 : 0;
+    const combatTarget = target === "combat" ? 1 : 0;
+
     musicMenuGainNode.gain.linearRampToValueAtTime(menuTarget, t + 1.2);
     musicCombatGainNode.gain.linearRampToValueAtTime(combatTarget, t + 1.2);
   }
