@@ -1,15 +1,12 @@
 /* ==========================================================================
-   GRIMOIRE: LOST PAGES — Motor de audio (G1 reescrito + corrección móvil)
-   SFX y música mediante Web Audio API con MP3 reales desde assets/audio/.
-   Expone window.AudioFX. No depende de game.js.
+   GRIMOIRE: LOST PAGES — Motor de audio (G1 reescrito)
+   Rollback a la última versión conocida buena + parche suave de visibilidad.
 
-   Corrección clave:
-   - No se crea AudioContext hasta el primer gesto del usuario.
-   - Los listeners de desbloqueo se mantienen hasta que ctx.state === "running".
-   - Se reintenta en pointerdown/touchend/click/keydown.
-   - Los MP3 se descargan como ArrayBuffer antes del gesto, pero se decodifican
-     solo cuando el contexto de audio existe y se desbloquea.
-   - El slider de volumen no es responsable de desbloquear el audio.
+   Esta versión conserva la lógica que ya hacía sonar menú y combate.
+   Único cambio principal:
+   - Al pasar a segundo plano / recientes, hace fade-out y suspende con delay.
+   - Al volver, hace resume y fade-in.
+   No se toca decodificación ni arranque de música más allá de lo necesario.
    ========================================================================== */
 
 (() => {
@@ -39,6 +36,11 @@
   const MUSIC_START_FADE = 0.25;
   const MUSIC_CROSSFADE = 1.2;
 
+  // Parche suave de visibilidad para móvil/recientes.
+  const VISIBILITY_FADE_OUT = 0.18;
+  const VISIBILITY_FADE_IN = 0.22;
+  const HIDDEN_SUSPEND_DELAY = 500;
+
   let ctx = null;
   let masterGain = null;
   let musicGain = null;
@@ -61,6 +63,9 @@
   let contextRunning = false;
   let musicInitialApplied = false;
   let visibilityBound = false;
+
+  let foreground = 1;
+  let hiddenTimeout = null;
 
   const mix = {
     music: 0.7,
@@ -90,19 +95,32 @@
 
   /* ==================== MEZCLA ==================== */
 
-  function applyMixValues() {
+  function applyMixValues(fade) {
     if (!ctx || !masterGain || !musicGain || !sfxGain) return;
 
     const t = ctx.currentTime;
+    const d = Number.isFinite(fade) && fade > 0 ? fade : 0.05;
 
     masterGain.gain.cancelScheduledValues(t);
-    masterGain.gain.linearRampToValueAtTime(mix.muted ? 0 : 1, t + 0.05);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, t);
+    masterGain.gain.linearRampToValueAtTime(
+      mix.muted ? 0 : foreground,
+      t + d
+    );
 
     musicGain.gain.cancelScheduledValues(t);
-    musicGain.gain.linearRampToValueAtTime(clamp01(mix.music) * 0.9, t + 0.05);
+    musicGain.gain.setValueAtTime(musicGain.gain.value, t);
+    musicGain.gain.linearRampToValueAtTime(
+      clamp01(mix.music) * 0.9,
+      t + d
+    );
 
     sfxGain.gain.cancelScheduledValues(t);
-    sfxGain.gain.linearRampToValueAtTime(clamp01(mix.sfx) * 0.9, t + 0.05);
+    sfxGain.gain.setValueAtTime(sfxGain.gain.value, t);
+    sfxGain.gain.linearRampToValueAtTime(
+      clamp01(mix.sfx) * 0.9,
+      t + d
+    );
   }
 
   /* ==================== CONTEXTO ==================== */
@@ -121,7 +139,7 @@
     musicGain.connect(masterGain);
     sfxGain.connect(masterGain);
 
-    applyMixValues();
+    applyMixValues(0.01);
     return ctx;
   }
 
@@ -167,7 +185,9 @@
 
   function onDecoded(name) {
     if (String(name).indexOf("music_") === 0 && contextRunning) {
-      applyIntensity(musicInitialApplied ? MUSIC_CROSSFADE : MUSIC_START_FADE);
+      applyIntensity(
+        musicInitialApplied ? MUSIC_CROSSFADE : MUSIC_START_FADE
+      );
       musicInitialApplied = true;
     }
   }
@@ -182,7 +202,7 @@
     decoding[name] = true;
 
     const onSuccess = (audioBuffer) => {
-      if (decoding[name] === false) return;
+      if (!decoding[name]) return;
       decoding[name] = false;
       audioBuffers[name] = audioBuffer;
       delete rawBuffers[name];
@@ -190,9 +210,12 @@
     };
 
     const onError = (error) => {
+      if (!decoding[name]) return;
       decoding[name] = false;
       failed[name] = true;
+      delete rawBuffers[name];
       console.warn("AudioFX: no se pudo decodificar", name, error);
+      onDecoded(name);
     };
 
     try {
@@ -200,11 +223,17 @@
       const promise = ctx.decodeAudioData(arrayBuffer.slice(0), onSuccess, onError);
 
       if (promise && typeof promise.then === "function") {
-        promise.then((audioBuffer) => {
-          if (!audioBuffers[name] && !failed[name]) onSuccess(audioBuffer);
-        }).catch((error) => {
-          if (!failed[name]) onError(error);
-        });
+        promise
+          .then((audioBuffer) => {
+            if (!audioBuffers[name] && !failed[name]) {
+              onSuccess(audioBuffer);
+            }
+          })
+          .catch((error) => {
+            if (!failed[name]) {
+              onError(error);
+            }
+          });
       }
     } catch (error) {
       onError(error);
@@ -222,11 +251,13 @@
 
     if (!menuGain) {
       menuGain = ctx.createGain();
+      menuGain.gain.value = 0;
       menuGain.connect(musicGain);
     }
 
     if (!combatGain) {
       combatGain = ctx.createGain();
+      combatGain.gain.value = 0;
       combatGain.connect(musicGain);
     }
 
@@ -253,7 +284,6 @@
 
     const t = ctx.currentTime;
 
-    // Arranca en silencio para evitar click inicial.
     gain.gain.cancelScheduledValues(t);
     gain.gain.setValueAtTime(0, t);
 
@@ -290,13 +320,11 @@
 
     const t = ctx.currentTime;
     const current = gain.gain.value;
+    const duration = Math.max(0.05, Number(fade) || MUSIC_CROSSFADE);
 
     gain.gain.cancelScheduledValues(t);
     gain.gain.setValueAtTime(current, t);
-    gain.gain.linearRampToValueAtTime(
-      clamped,
-      t + Math.max(0.05, Number(fade) || MUSIC_CROSSFADE)
-    );
+    gain.gain.linearRampToValueAtTime(clamped, t + duration);
   }
 
   function applyIntensity(fade) {
@@ -313,11 +341,11 @@
 
   function play(name) {
     if (!ctx || ctx.state !== "running" || mix.muted) return;
+    if (document.hidden || foreground < 0.01) return;
 
     const buffer = audioBuffers[name];
 
     if (!buffer) {
-      // Si ya está descargado pero aún no decodificado, intenta decodificar.
       if (loaded[name] && !failed[name] && !decoding[name]) {
         decodeName(name);
       }
@@ -365,7 +393,6 @@
         });
     }
 
-    // En algunos navegadores el estado cambia de forma síncrona.
     if (ctx.state === "running") {
       markContextRunning();
     }
@@ -402,6 +429,101 @@
     unlockHandler = null;
   }
 
+  /* ==================== VISIBILIDAD / SEGUNDO PLANO ==================== */
+
+  function suspendContextIfStillHidden() {
+    hiddenTimeout = null;
+
+    if (!ctx) return;
+    if (!document.hidden) return;
+    if (ctx.state !== "running") return;
+
+    try {
+      ctx.suspend();
+    } catch (error) {
+      // Silencioso.
+    }
+  }
+
+  function onVisibilityChange() {
+    if (!ctx) return;
+
+    if (document.hidden) {
+      if (hiddenTimeout) {
+        window.clearTimeout(hiddenTimeout);
+        hiddenTimeout = null;
+      }
+
+      foreground = 0;
+      applyMixValues(VISIBILITY_FADE_OUT);
+
+      hiddenTimeout = window.setTimeout(
+        suspendContextIfStillHidden,
+        HIDDEN_SUSPEND_DELAY
+      );
+
+      return;
+    }
+
+    if (hiddenTimeout) {
+      window.clearTimeout(hiddenTimeout);
+      hiddenTimeout = null;
+    }
+
+    const restore = () => {
+      foreground = 1;
+      applyMixValues(VISIBILITY_FADE_IN);
+      if (contextRunning) {
+        applyIntensity(0.25);
+      }
+    };
+
+    if (!contextRunning && ctx.state === "running") {
+      markContextRunning();
+    }
+
+    if (ctx.state === "suspended") {
+      let resumePromise = null;
+
+      try {
+        resumePromise = ctx.resume();
+      } catch (error) {
+        resumePromise = null;
+      }
+
+      if (resumePromise && typeof resumePromise.then === "function") {
+        resumePromise
+          .then(() => {
+            if (ctx && ctx.state === "running") {
+              if (!contextRunning) markContextRunning();
+              restore();
+            } else {
+              bindUnlockListeners();
+            }
+          })
+          .catch(() => {
+            bindUnlockListeners();
+          });
+      } else if (ctx.state === "running") {
+        if (!contextRunning) markContextRunning();
+        restore();
+      } else {
+        bindUnlockListeners();
+      }
+    } else if (ctx.state === "running") {
+      if (!contextRunning) markContextRunning();
+      restore();
+    } else {
+      bindUnlockListeners();
+    }
+  }
+
+  function bindVisibility() {
+    if (visibilityBound) return;
+    visibilityBound = true;
+    document.addEventListener("visibilitychange", onVisibilityChange);
+  }
+
   /* ==================== API PÚBLICA ==================== */
 
   function setIntensity(mode) {
@@ -431,86 +553,52 @@
 
     if (!ctx) return;
 
-    applyMixValues();
+    applyMixValues(0.05);
 
-    if (ctx.state === "suspended" && !mix.muted) {
+    if (ctx.state === "suspended" && !mix.muted && !document.hidden) {
       let resumePromise = null;
 
       try {
         resumePromise = ctx.resume();
       } catch (error) {
-        // Silencioso.
+        resumePromise = null;
       }
 
       if (resumePromise && typeof resumePromise.then === "function") {
         resumePromise
           .then(() => {
             if (ctx && ctx.state === "running") {
-              markContextRunning();
+              if (!contextRunning) {
+                markContextRunning();
+              } else {
+                foreground = 1;
+                applyMixValues(VISIBILITY_FADE_IN);
+                applyIntensity(0.25);
+              }
             }
           })
           .catch(() => {
-            bindUnlockListeners();
+            // Silencioso. Los listeners de gesto seguirán si aún no hay contexto running.
           });
       } else if (ctx.state === "running") {
-        markContextRunning();
+        if (!contextRunning) {
+          markContextRunning();
+        } else {
+          foreground = 1;
+          applyMixValues(VISIBILITY_FADE_IN);
+          applyIntensity(0.25);
+        }
       }
-    } else if (ctx.state === "running" && !contextRunning) {
-      markContextRunning();
     }
   }
 
   function init() {
-    // IMPORTANTE: no creamos AudioContext aquí.
+    if (!supportedAudioContext()) return;
+
     bindUnlockListeners();
+    bindVisibility();
 
-    // Precargamos los MP3 como ArrayBuffer. Esto no requiere AudioContext.
     ALL_NAMES.forEach(fetchRaw);
-
-    if (!visibilityBound) {
-      visibilityBound = true;
-
-      document.addEventListener("visibilitychange", () => {
-        if (!ctx) return;
-
-        if (document.hidden) {
-          try {
-            ctx.suspend();
-          } catch (error) {
-            // Silencioso.
-          }
-          return;
-        }
-
-        if (mix.muted) return;
-
-        let resumePromise = null;
-
-        try {
-          resumePromise = ctx.resume();
-        } catch (error) {
-          // Silencioso.
-        }
-
-        if (resumePromise && typeof resumePromise.then === "function") {
-          resumePromise
-            .then(() => {
-              if (ctx && ctx.state === "running") {
-                markContextRunning();
-              } else {
-                bindUnlockListeners();
-              }
-            })
-            .catch(() => {
-              bindUnlockListeners();
-            });
-        } else if (ctx.state === "running") {
-          markContextRunning();
-        } else {
-          bindUnlockListeners();
-        }
-      });
-    }
   }
 
   window.AudioFX = {
