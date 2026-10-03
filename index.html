@@ -37,6 +37,10 @@
             <section id="player-panel" class="hud-panel player-panel" aria-label="Estado del jugador">
                 <h2 class="panel-label">Vitalidad</h2>
                 <p id="player-hp" class="stat-value">--/--</p>
+                <!-- G0.5: barra de vida del jugador (espejo de la del enemigo) -->
+                <div class="hp-bar" aria-hidden="true">
+                    <div id="player-hp-fill" class="hp-fill"></div>
+                </div>
                 <div id="player-effects" class="effects-list" aria-label="Efectos del jugador"></div>
             </section>
 
@@ -50,6 +54,10 @@
             <section id="enemy-panel" class="hud-panel enemy-panel" aria-label="Estado del enemigo">
                 <h2 id="enemy-name" class="enemy-name">Amenaza</h2>
                 <p id="enemy-hp" class="stat-value">--</p>
+                <!-- G0: barra de vida del enemigo (el número sigue encima, no se sustituye) -->
+                <div class="hp-bar" aria-hidden="true">
+                    <div id="enemy-hp-fill" class="hp-fill"></div>
+                </div>
                 <div id="enemy-intent" class="enemy-intent" aria-label="Intención del enemigo"></div>
             </section>
 
@@ -57,6 +65,9 @@
 
         <!-- Zona central de combate/ritual -->
         <section id="battlefield" class="battlefield" aria-label="Campo de ritual">
+
+            <!-- G0: contador de turno discreto -->
+            <span id="turn-label" class="turn-label">Turno --</span>
 
             <!-- Avatar simbólico del enemigo. Más adelante puede sustituirse por arte o efecto. -->
             <div id="enemy-avatar" class="enemy-avatar" aria-hidden="true">
@@ -199,7 +210,7 @@
         </div>
     </div>
 
-    <!-- M1: sub-pantalla de Cronología (será rellenada en M3) -->
+    <!-- M1: sub-pantalla de Cronología (será rellenada en M3/E4) -->
     <div id="history-screen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="history-title" hidden>
         <div class="overlay-card">
             <h2 id="history-title">Cronología</h2>
@@ -210,7 +221,7 @@
         </div>
     </div>
 
-    <!-- M1: sub-pantalla de Ajustes (será rellenada en M2) -->
+    <!-- M1: sub-pantalla de Ajustes (rellenada por M2 desde game.js; G1 añade sliders de audio) -->
     <div id="settings-screen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
         <div class="overlay-card">
             <h2 id="settings-title">Ajustes</h2>
@@ -234,6 +245,10 @@
 
     <!-- Lógica del juego. No se modifica en Fase 1. -->
     <script src="./src/logic.js"></script>
+
+    <!-- G1: motor de audio procedural (Web Audio API, cero archivos).
+         Debe cargarse antes de game.js para que window.AudioFX exista. -->
+    <script src="./src/audio.js"></script>
 
     <!-- Controlador de interfaz HTML/CSS. -->
     <script src="./game.js"></script>
