@@ -2608,3 +2608,80 @@ html.app-oled .deck-counter {
     width: 6.5rem;
   }
 }
+/* ==========================================================================
+   G1.5: LIMPIEZA DE FOCO/REALCE NATIVO EN AJUSTES Y CONTROLES
+   Evita el recuadro azul genérico de Chrome/Android en sliders, switches y
+   botones, sustituyéndolo por foco dorado accesible solo con teclado.
+   ========================================================================== */
+
+button,
+input,
+select,
+textarea,
+label,
+.ritual-button,
+.text-link-btn,
+.icon-button,
+.deck-counter,
+.setting-row,
+.setting-slider,
+.setting-toggle {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.settings-body,
+.settings-body * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.setting-row:focus,
+.setting-row:focus-within {
+  outline: none;
+}
+
+.setting-slider:focus,
+.ritual-button:focus,
+.text-link-btn:focus,
+.icon-button:focus,
+.deck-counter:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.setting-slider:focus:not(:focus-visible),
+.ritual-button:focus:not(:focus-visible),
+.text-link-btn:focus:not(:focus-visible),
+.icon-button:focus:not(:focus-visible),
+.deck-counter:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.setting-slider:focus-visible,
+.ritual-button:focus-visible,
+.text-link-btn:focus-visible,
+.icon-button:focus-visible,
+.deck-counter:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.setting-toggle:focus {
+  outline: none;
+}
+
+.setting-toggle:focus-visible + .setting-switch {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+input[type="range"]::-moz-focus-outer {
+  border: 0;
+}
+
+.setting-slider::-webkit-slider-runnable-track,
+.setting-slider::-moz-range-track {
+  outline: none;
+}
