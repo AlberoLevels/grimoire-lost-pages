@@ -1,10 +1,10 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — SERVICE WORKER
    PWA / offline básico.
-   v38: actualización de assets y mejoras en el manejo de caché.
+   v39: actualización de assets y mejoras en el manejo de caché.
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v38";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v39";
 
 const CORE_ASSETS = [
   "./",
