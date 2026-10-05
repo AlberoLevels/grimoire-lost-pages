@@ -3,11 +3,16 @@
    + Parche G2/G2.1: cola de música pendiente + música antes que SFX + clave
      buffer->lógico en onDecoded (suena al primer toque, sin visibilitychange).
    + CAPA 2 (G2.1): sting narrativo del ritual (ritual_sting), one-shot con
-     cola+flush respetando la política de autoplay de Web Audio (no se reproduce
-     con el contexto suspended; se dispara al pasar a running o al decodificar).
-     Tratado como opcional: sin el MP3 no suena, no rompe y no lanza warn.
-   Reversible (capa 2): borra STING_NAMES, stingGain, pendingSting, playSting,
-   flushPendingStings/flushPendingSting, los flush y la llamada en game.js.
+     cola+flush respetando la política de autoplay.
+   + FIX BUG INTRO:
+     - Durante la intro previa, intensidad por defecto "none": tocar fuera del
+       ente desbloquea audio en silencio pero NO arranca música del menú.
+     - Sting normalizado a pico objetivo + limiter suave + mini fade inicial
+       para reducir bajo volumen, clipping y click/pop de arranque.
+   Reversible (capa 2): borra STING_NAMES, stingGain, stingLimiter,
+   pendingSting, playSting, flushPendingStings/flushPendingSting,
+   stingNormalization, computeAudioPeak, computeStingNormalization,
+   getStingDebug y la llamada en game.js.
    ========================================================================== */
 
 (() => {
@@ -45,11 +50,19 @@
   const VISIBILITY_FADE_IN = 0.22;
   const HIDDEN_SUSPEND_DELAY = 500;
 
+  // Sting: nivel base tras normalización. 1.0 = pico objetivo ya ajustado.
+  // Si quieres más presencia sin saturar, sube esto a 1.08 / 1.15.
+  const STING_LEVEL = 1.0;
+
+  // Pico objetivo del sting: 0.89 ~= -1 dBFS. Deja margen anti-clipping.
+  const STING_TARGET_PEAK = 0.89;
+
   let ctx = null;
   let masterGain = null;
   let musicGain = null;
   let sfxGain = null;
-  let stingGain = null; // CAPA 2: gain propio del sting (independiente de música/SFX)
+  let stingGain = null;
+  let stingLimiter = null;
 
   const rawBuffers = {};
   const audioBuffers = {};
@@ -58,8 +71,11 @@
   const failed = {};
   const decoding = {};
 
+  // Normalización por sting: gain aplicado al buffer para alcanzar pico objetivo.
+  const stingNormalization = {};
+
   const pendingMusic = {};   // claves lógicas: "menu" | "combat"
-  const pendingSting = {};   // CAPA 2: claves = nombre de sting ("ritual_sting")
+  const pendingSting = {};   // claves = nombre de sting ("ritual_sting")
 
   let menuGain = null;
   let combatGain = null;
@@ -78,7 +94,9 @@
     music: 0.7,
     sfx: 0.9,
     muted: false,
-    intensity: "menu"
+    // FIX BUG INTRO: por defecto NO arrancar música.
+    // showMenu() pondrá "menu"; showCombat() pondrá "combat".
+    intensity: "none"
   };
 
   /* ==================== UTILIDADES ==================== */
@@ -98,6 +116,45 @@
     if (p && typeof p.then === "function") {
       p.then(undefined, () => {});
     }
+  }
+
+  /* ==================== ANÁLISIS DE STING ==================== */
+
+  function computeAudioPeak(buffer) {
+    if (!buffer || typeof buffer.getChannelData !== "function") return 0;
+
+    let peak = 0;
+    const channels = buffer.numberOfChannels || 1;
+
+    for (let ch = 0; ch < channels; ch++) {
+      let data;
+      try {
+        data = buffer.getChannelData(ch);
+      } catch (e) {
+        continue;
+      }
+
+      if (!data || !data.length) continue;
+
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i] < 0 ? -data[i] : data[i];
+        if (v > peak) peak = v;
+      }
+    }
+
+    return peak;
+  }
+
+  function computeStingNormalization(buffer) {
+    const peak = computeAudioPeak(buffer);
+
+    // Si el buffer está prácticamente mudo, no lo explosivamos.
+    if (!Number.isFinite(peak) || peak < 0.001) return 1;
+
+    const gain = STING_TARGET_PEAK / peak;
+
+    // Límites sensatos: no bajar más de 0.25x ni subir más de 4x.
+    return Math.min(4, Math.max(0.25, gain));
   }
 
   /* ==================== MEZCLA ==================== */
@@ -190,6 +247,7 @@
       .catch((error) => {
         failed[name] = true;
         loading[name] = false;
+
         // CAPA 2: los stings son opcionales (plug-and-play). Si aún no existe
         // el MP3, no ensuciamos la consola: falla en silencio y sin warn.
         if (STING_NAMES.indexOf(name) === -1) {
@@ -243,7 +301,14 @@
     const onSuccess = (audioBuffer) => {
       if (!decoding[name]) return;
       decoding[name] = false;
+
       audioBuffers[name] = audioBuffer;
+
+      // CAPA 2: normalizar sting al decodificar.
+      if (STING_NAMES.indexOf(name) !== -1) {
+        stingNormalization[name] = computeStingNormalization(audioBuffer);
+      }
+
       delete rawBuffers[name];
       onDecoded(name);
     };
@@ -253,9 +318,11 @@
       decoding[name] = false;
       failed[name] = true;
       delete rawBuffers[name];
+
       if (STING_NAMES.indexOf(name) === -1) {
         console.warn("AudioFX: no se pudo decodificar", name, error);
       }
+
       onDecoded(name);
     };
 
@@ -381,6 +448,13 @@
   function applyIntensity(fade) {
     if (!ctx || !contextRunning || ctx.state !== "running") return;
 
+    // FIX BUG INTRO: "none" apaga/evita música sin impedir sting/SFX.
+    if (mix.intensity === "none") {
+      setMusicTarget("menu", 0, fade);
+      setMusicTarget("combat", 0, fade);
+      return;
+    }
+
     const target = mix.intensity === "combat" ? "combat" : "menu";
     const other = target === "combat" ? "menu" : "combat";
 
@@ -416,8 +490,24 @@
 
     if (!stingGain) {
       stingGain = ctx.createGain();
-      stingGain.gain.value = 1; // volumen pleno del ritual; palanca si quieres más suave
-      stingGain.connect(masterGain);
+      stingGain.gain.value = 1;
+
+      // Limiter suave solo para el sting: evita petardeo/clipping si el MP3
+      // viene caliente, sin reventar el golpe inicial.
+      try {
+        stingLimiter = ctx.createDynamicsCompressor();
+        stingLimiter.threshold.value = -1.0; // dBFS
+        stingLimiter.knee.value = 0;
+        stingLimiter.ratio.value = 20;
+        stingLimiter.attack.value = 0.003;
+        stingLimiter.release.value = 0.12;
+        stingGain.connect(stingLimiter);
+        stingLimiter.connect(masterGain);
+      } catch (e) {
+        // Si el navegador no soporta bien el compresor, fallback directo.
+        stingLimiter = null;
+        stingGain.connect(masterGain);
+      }
     }
 
     return true;
@@ -428,7 +518,11 @@
   // start() sobre suspended, que es lo que hacía fallar el sonido antes).
   function playSting(name) {
     if (mix.muted) return;            // silenciado: no suena y no se encola
-    if (failed[name]) return;         // asset inexistente: nada que hacer, sin cola
+
+    if (failed[name]) {
+      delete pendingSting[name];      // asset inexistente: limpiar cola
+      return;
+    }
 
     if (!ctx || ctx.state !== "running") {
       pendingSting[name] = true;      // se soltará al pasar a running
@@ -448,8 +542,30 @@
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(stingGain);
-    source.start(ctx.currentTime);
+
+    // Ganancia por reproducción: normalización + nivel base.
+    const norm = Number(stingNormalization[name]);
+    const level = STING_LEVEL * (Number.isFinite(norm) && norm > 0 ? norm : 1);
+
+    // Mini envolvente para evitar click/pop en el arranque del buffer.
+    const env = ctx.createGain();
+    const now = ctx.currentTime;
+    const start = now + 0.02;       // 20 ms por delante: evita glitches al resume()
+    const attack = 0.006;           // 6 ms: casi inaudible, mata el click inicial
+
+    env.gain.cancelScheduledValues(now);
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(level, start + attack);
+
+    source.connect(env);
+    env.connect(stingGain);
+
+    source.start(start);
+
+    source.onended = () => {
+      try { source.disconnect(); } catch (e) {}
+      try { env.disconnect(); } catch (e) {}
+    };
   }
 
   /* ==================== DESBLOQUEO POR GESTO ==================== */
@@ -621,7 +737,13 @@
   /* ==================== API PÚBLICA ==================== */
 
   function setIntensity(mode) {
-    mix.intensity = mode === "combat" ? "combat" : "menu";
+    if (mode === "combat") {
+      mix.intensity = "combat";
+    } else if (mode === "none") {
+      mix.intensity = "none";
+    } else {
+      mix.intensity = "menu";
+    }
 
     if (contextRunning && ctx && ctx.state === "running") {
       applyIntensity(MUSIC_CROSSFADE);
@@ -695,12 +817,30 @@
     ALL_NAMES.forEach(fetchRaw);
   }
 
+  // Debug opcional para el sting: desde consola,
+  // AudioFX.getStingDebug("ritual_sting")
+  function getStingDebug(name) {
+    return {
+      name,
+      loaded: loaded[name] === true,
+      failed: failed[name] === true,
+      decoded: !!audioBuffers[name],
+      normalization: stingNormalization[name] || null,
+      pending: pendingSting[name] === true,
+      contextRunning,
+      state: ctx ? ctx.state : null,
+      intensity: mix.intensity,
+      muted: mix.muted
+    };
+  }
+
   window.AudioFX = {
     init,
     unlock,
     play,
     playSting,
     setIntensity,
-    applySettings
+    applySettings,
+    getStingDebug
   };
 })();
