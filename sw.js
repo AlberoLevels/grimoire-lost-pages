@@ -1,7 +1,7 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — Service Worker (PWA / offline)
-   Versión: v69
-   Cambios vs v68:
+   Versión: v71
+   Cambios vs v70:
    - Añadido ./vendor/gsap.min.js al precache (setup GSAP, fase G2).
    - Bump de caché.
    Se MANTIENE el guard crítico: el SW no intercepta su propio sw.js.
@@ -16,7 +16,7 @@
    - limpieza de cachés obsoletas.
    ========================================================================== */
 
-const CACHE_NAME = "grimoire-lost-pages-pwa-v69";
+const CACHE_NAME = "grimoire-lost-pages-pwa-v71";
 
 const PRECACHE_URLS = [
   "./",
