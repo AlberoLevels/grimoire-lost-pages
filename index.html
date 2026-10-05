@@ -119,47 +119,58 @@
 
     </main>
 
+    <!-- G2.1 CAPA 1 — Intro previa (primera apertura). Negra, solo el ente.
+         Se muestra/oculta desde game.js según FIRST_TIME_KEY. El toque al
+         glifo comienza el ritual y da paso al hub. Sin anillos, sin tinta,
+         sin parpadeo (el ente es luz/energía, no un ojo). -->
+    <div id="ritual-intro" hidden>
+        <button id="ritual-glyph" class="ritual-glyph-btn" type="button"
+                aria-label="Tocar el ente para comenzar el ritual">
+            <span class="ritual-core">
+                <span class="ritual-star" aria-hidden="true">✦</span>
+            </span>
+        </button>
+        <p id="ritual-hint" class="ritual-hint">Toca el ente para comenzar el ritual</p>
+    </div>
+
     <!-- Overlay: Menú Principal / Hub Narrativo -->
-    <div id="intro-screen" class="overlay menu-hub" role="dialog" aria-modal="true" aria-labelledby="intro-title">
-        
+    <div id="intro-screen" class="overlay menu-hub" role="dialog" aria-modal="true" aria-labelledby="intro-title" hidden>
+
         <!-- Zona Izquierda: Navegación Funcional -->
         <aside class="menu-nav-panel">
             <h1 id="intro-title" class="menu-logo">Grimoire<span class="title-sep" aria-hidden="true"></span>Lost Pages</h1>
-            
+
             <nav class="menu-actions" aria-label="Opciones principales">
                 <button id="start-game" class="ritual-button primary-menu-btn" type="button">
                     Abrir el Grimorio
                 </button>
-                
+
                 <button id="continue-game" class="ritual-button secondary-menu-btn" type="button" hidden>
                     Continuar Ritual
                 </button>
-                
+
                 <div class="menu-divider" aria-hidden="true"></div>
-                
+
                 <div class="menu-secondary-group">
                     <button id="open-history" class="text-link-btn" type="button">Cronología</button>
                     <button id="open-settings" class="text-link-btn" type="button">Ajustes</button>
                     <button id="open-lore" class="text-link-btn" type="button">Lore</button>
                 </div>
             </nav>
-            
+
             <footer class="menu-footer">
                 <p>v0.1 Alpha • © 2026 AlberoLevels. Todos los derechos reservados.</p>
             </footer>
         </aside>
 
-        <!-- Zona Derecha: Artefacto Viviente (Esfera Arcana) -->
+        <!-- Zona Derecha: Artefacto Viviente (esfera arcana, SIN anillos).
+             Los anillos salen del hub; su vida pasa a los haces de luz (capa 1b). -->
         <section class="menu-artifact-stage" aria-hidden="true">
-            <!-- Capa de partículas confinada a esta zona -->
+            <!-- Capa de partículas confinada a esta zona (se migrará a GSAP/Canvas en 1b/2) -->
             <div id="artifact-particles" class="particle-container"></div>
-            
+
             <!-- Contenedor central de la esfera -->
             <div class="arcane-orb-wrapper">
-                <!-- Anillo rúnico exterior -->
-                <div class="orb-ring outer-ring"></div>
-                <div class="orb-ring inner-ring"></div>
-                
                 <!-- Núcleo luminoso -->
                 <div class="orb-core">
                     <span id="menu-star-glyph" class="star-glyph">✦</span>
@@ -249,6 +260,10 @@
     <!-- G1: motor de audio procedural (Web Audio API, cero archivos).
          Debe cargarse antes de game.js para que window.AudioFX exista. -->
     <script src="./src/audio.js"></script>
+
+    <!-- G2: librería de animación GSAP.
+         Debe cargarse antes de game.js para que window.gsap exista. -->
+    <script src="./vendor/gsap.min.js"></script>
 
     <!-- Controlador de interfaz HTML/CSS. -->
     <script src="./game.js"></script>
