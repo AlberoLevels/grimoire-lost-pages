@@ -438,6 +438,11 @@
   function showRitualIntro() {
     ritualIntroHandled = false;
 
+    // FIX BUG: durante la intro previa no debe sonar música del menú.
+    // Tocar fuera del ente seguirá desbloqueando audio en silencio,
+    // pero el pad no arranca hasta showMenu().
+    setAudioIntensity("none");
+
     // El menú principal no se ve detrás durante la intro previa.
     if (els.intro) els.intro.hidden = true;
 
