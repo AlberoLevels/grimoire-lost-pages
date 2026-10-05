@@ -1,12 +1,13 @@
 /* ==========================================================================
    GRIMOIRE: LOST PAGES — Motor de audio (G1 reescrito)
-   Rollback a la última versión conocida buena + parche suave de visibilidad.
-
-   Esta versión conserva la lógica que ya hacía sonar menú y combate.
-   Único cambio principal:
-   - Al pasar a segundo plano / recientes, hace fade-out y suspende con delay.
-   - Al volver, hace resume y fade-in.
-   No se toca decodificación ni arranque de música más allá de lo necesario.
+   + Parche G2/G2.1: cola de música pendiente + música antes que SFX + clave
+     buffer->lógico en onDecoded (suena al primer toque, sin visibilitychange).
+   + CAPA 2 (G2.1): sting narrativo del ritual (ritual_sting), one-shot con
+     cola+flush respetando la política de autoplay de Web Audio (no se reproduce
+     con el contexto suspended; se dispara al pasar a running o al decodificar).
+     Tratado como opcional: sin el MP3 no suena, no rompe y no lanza warn.
+   Reversible (capa 2): borra STING_NAMES, stingGain, pendingSting, playSting,
+   flushPendingStings/flushPendingSting, los flush y la llamada en game.js.
    ========================================================================== */
 
 (() => {
@@ -31,12 +32,15 @@
   ];
 
   const MUSIC_NAMES = ["music_menu", "music_combat"];
-  const ALL_NAMES = [...SFX_NAMES, ...MUSIC_NAMES];
+
+  // CAPA 2: stings narrativos (one-shot, sin loop, sin crossfade).
+  const STING_NAMES = ["ritual_sting"];
+
+  const ALL_NAMES = [...SFX_NAMES, ...MUSIC_NAMES, ...STING_NAMES];
 
   const MUSIC_START_FADE = 0.25;
   const MUSIC_CROSSFADE = 1.2;
 
-  // Parche suave de visibilidad para móvil/recientes.
   const VISIBILITY_FADE_OUT = 0.18;
   const VISIBILITY_FADE_IN = 0.22;
   const HIDDEN_SUSPEND_DELAY = 500;
@@ -45,6 +49,7 @@
   let masterGain = null;
   let musicGain = null;
   let sfxGain = null;
+  let stingGain = null; // CAPA 2: gain propio del sting (independiente de música/SFX)
 
   const rawBuffers = {};
   const audioBuffers = {};
@@ -52,6 +57,9 @@
   const loaded = {};
   const failed = {};
   const decoding = {};
+
+  const pendingMusic = {};   // claves lógicas: "menu" | "combat"
+  const pendingSting = {};   // CAPA 2: claves = nombre de sting ("ritual_sting")
 
   let menuGain = null;
   let combatGain = null;
@@ -61,7 +69,6 @@
   let unlockHandler = null;
   let unlockListenersBound = false;
   let contextRunning = false;
-  let musicInitialApplied = false;
   let visibilityBound = false;
 
   let foreground = 1;
@@ -151,7 +158,13 @@
 
     contextRunning = true;
     removeUnlockListeners();
+
+    applyIntensity(MUSIC_START_FADE);
     decodeAllLoaded();
+
+    // CAPA 2: al pasar a running, soltamos los stings que estaban en cola
+    // (cuyos buffers ya estuvieran decodificados antes de este momento).
+    flushPendingStings();
   }
 
   /* ==================== DESCARGA RAW ==================== */
@@ -177,18 +190,44 @@
       .catch((error) => {
         failed[name] = true;
         loading[name] = false;
-        console.warn("AudioFX: no se pudo descargar", url, error);
+        // CAPA 2: los stings son opcionales (plug-and-play). Si aún no existe
+        // el MP3, no ensuciamos la consola: falla en silencio y sin warn.
+        if (STING_NAMES.indexOf(name) === -1) {
+          console.warn("AudioFX: no se pudo descargar", url, error);
+        }
       });
   }
 
   /* ==================== DECODIFICACIÓN ==================== */
 
+  function flushPendingMusic(name) {
+    const pending = pendingMusic[name];
+    if (!pending) return;
+
+    delete pendingMusic[name];
+    setMusicTarget(name, pending.target, pending.fade);
+  }
+
+  // CAPA 2: soltar un sting concreto si estaba en cola.
+  function flushPendingSting(name) {
+    if (pendingSting[name]) playSting(name);
+  }
+
+  // CAPA 2: soltar todos los stings en cola (idempotente: playSting borra la
+  // clave solo cuando de verdad reproduce; si aún no puede, la re-encola).
+  function flushPendingStings() {
+    Object.keys(pendingSting).forEach((k) => playSting(k));
+  }
+
   function onDecoded(name) {
+    // Música: traducir buffer -> lógico antes de vaciar la cola.
     if (String(name).indexOf("music_") === 0 && contextRunning) {
-      applyIntensity(
-        musicInitialApplied ? MUSIC_CROSSFADE : MUSIC_START_FADE
-      );
-      musicInitialApplied = true;
+      flushPendingMusic(name.slice("music_".length));
+    }
+
+    // CAPA 2: si un sting acaba de decodificarse y el contexto ya corre, suéltalo.
+    if (STING_NAMES.indexOf(name) !== -1 && contextRunning) {
+      flushPendingSting(name);
     }
   }
 
@@ -214,12 +253,13 @@
       decoding[name] = false;
       failed[name] = true;
       delete rawBuffers[name];
-      console.warn("AudioFX: no se pudo decodificar", name, error);
+      if (STING_NAMES.indexOf(name) === -1) {
+        console.warn("AudioFX: no se pudo decodificar", name, error);
+      }
       onDecoded(name);
     };
 
     try {
-      // slice(0) evita problemas si el ArrayBuffer queda transferido/detached.
       const promise = ctx.decodeAudioData(arrayBuffer.slice(0), onSuccess, onError);
 
       if (promise && typeof promise.then === "function") {
@@ -241,7 +281,10 @@
   }
 
   function decodeAllLoaded() {
-    ALL_NAMES.forEach(decodeName);
+    // Música y stings antes que los SFX (bajar latencia de lo narrativo).
+    MUSIC_NAMES.forEach(decodeName);
+    STING_NAMES.forEach(decodeName);
+    SFX_NAMES.forEach(decodeName);
   }
 
   /* ==================== MÚSICA ==================== */
@@ -303,9 +346,10 @@
 
     const bufferName = "music_" + name;
     const clamped = clamp01(target);
+    const duration = Math.max(0.05, Number(fade) || MUSIC_CROSSFADE);
 
-    if (clamped > 0.001 && !audioBuffers[bufferName]) {
-      console.warn("AudioFX: pista de música no disponible:", bufferName);
+    if (clamped > 0.001 && failed[bufferName]) {
+      delete pendingMusic[name];
       return;
     }
 
@@ -315,12 +359,19 @@
     if (!gain) return;
 
     if (clamped > 0.001) {
+      if (!audioBuffers[bufferName]) {
+        pendingMusic[name] = { target: clamped, fade: duration };
+        return;
+      }
+
+      delete pendingMusic[name];
       startMusicSource(name);
+    } else {
+      delete pendingMusic[name];
     }
 
     const t = ctx.currentTime;
     const current = gain.gain.value;
-    const duration = Math.max(0.05, Number(fade) || MUSIC_CROSSFADE);
 
     gain.gain.cancelScheduledValues(t);
     gain.gain.setValueAtTime(current, t);
@@ -355,6 +406,49 @@
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(sfxGain);
+    source.start(ctx.currentTime);
+  }
+
+  /* ==================== CAPA 2: STINGS (one-shot narrativo) ==================== */
+
+  function ensureStingGain() {
+    if (!ctx || !masterGain) return false;
+
+    if (!stingGain) {
+      stingGain = ctx.createGain();
+      stingGain.gain.value = 1; // volumen pleno del ritual; palanca si quieres más suave
+      stingGain.connect(masterGain);
+    }
+
+    return true;
+  }
+
+  // Reproduce un sting una sola vez. Respeta la política de autoplay: si el
+  // contexto aún no corre o el buffer no está, lo ENCOLA (no lo fuerza con
+  // start() sobre suspended, que es lo que hacía fallar el sonido antes).
+  function playSting(name) {
+    if (mix.muted) return;            // silenciado: no suena y no se encola
+    if (failed[name]) return;         // asset inexistente: nada que hacer, sin cola
+
+    if (!ctx || ctx.state !== "running") {
+      pendingSting[name] = true;      // se soltará al pasar a running
+      return;
+    }
+
+    if (!ensureStingGain()) return;
+
+    const buffer = audioBuffers[name];
+    if (!buffer) {
+      if (loaded[name] && !decoding[name]) decodeName(name);
+      pendingSting[name] = true;      // se soltará al decodificar (onDecoded)
+      return;
+    }
+
+    delete pendingSting[name];
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(stingGain);
     source.start(ctx.currentTime);
   }
 
@@ -578,7 +672,7 @@
             }
           })
           .catch(() => {
-            // Silencioso. Los listeners de gesto seguirán si aún no hay contexto running.
+            // Silencioso.
           });
       } else if (ctx.state === "running") {
         if (!contextRunning) {
@@ -605,6 +699,7 @@
     init,
     unlock,
     play,
+    playSting,
     setIntensity,
     applySettings
   };
