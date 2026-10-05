@@ -19,6 +19,9 @@
    + G1: SLIDERS DE AUDIO (Música / Efectos) en Ajustes
    + G1.5: RESPONSIVE SÓLIDO + LIMPIEZA DE FOCO AZUL NATIVO EN CONTROLES
    Móvil vertical + PC horizontal + tablet
+   + G2.1 CAPA 1: INTRO PREVIA (negro puro, el ente como única luz)
+   + G2.1 CAPA 1b v16: HALOS (haz violeta que barre + membrana cian que late)
+   + FIX parpadeo residual intro previa -> menú (hub opaco al entrar, funden paneles)
    ========================================================================== */
 
 :root {
@@ -2254,33 +2257,36 @@ h3,
 }
 
 /* ==========================================================================
-   M1-HUB fix: transición de entrada/salida del menú
+   M1-HUB fix (v2): transición de entrada/salida del menú.
+   Causa del parpadeo residual: hubEnter arrancaba en opacity:0 sobre .menu-hub,
+   que es la capa opaca que tapa el combate -> durante 380ms asomaba el combate.
+   Fix: al ENTRAR, .menu-hub se queda opaco (animation:none, fondo opaco) y lo
+   que funde son los paneles internos sobre ese negro. Al SALIR (menu-hub--leaving)
+   se mantiene el fade del hub entero, porque ahi si queremos revelar el combate.
+   No toca game.js (las clases entering/leaving ya las pone el JS actual).
+   Reversible: restaura el tramo anterior.
    ========================================================================== */
 
-@keyframes hubEnter {
-  from {
-    opacity: 0;
-    transform: scale(1.06);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes hubLeave {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.12);
-  }
-}
-
+/* Entrada: el hub NO se desvanece (tapa el combate siempre); funden los paneles. */
 .menu-hub--entering {
-  animation: hubEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: none;
+  background: var(--bg-deep); /* opaco garantizado desde el frame 0 */
+}
+
+.menu-hub--entering .menu-nav-panel,
+.menu-hub--entering .menu-artifact-stage {
+  animation: panelEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes panelEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Salida: igual que antes, el hub entero se desvanece y revela el combate. */
+@keyframes hubLeave {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.12); }
 }
 
 .menu-hub--leaving {
@@ -2292,6 +2298,12 @@ h3,
   .menu-hub--entering,
   .menu-hub--leaving {
     animation: none !important;
+  }
+  .menu-hub--entering .menu-nav-panel,
+  .menu-hub--entering .menu-artifact-stage {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 
@@ -2908,3 +2920,273 @@ input[type="range"]::-moz-focus-outer {
   outline: 2px solid var(--gold);
   outline-offset: 4px;
 }
+
+/* ==========================================================================
+   G1.5-T5 — PASO 1 (corregido): ARREGLO SOLO TABLET EN VERTICAL
+   Candado real: táctil + vertical + ancho >= 600px.
+   -> PC fuera (no táctil). Móvil fuera (ancho < 600px en vertical).
+      Tablet en horizontal fuera (no vertical) -> se ve como PC.
+   - Carta más ANCHA y menos alargada.
+   - Título hasta 3 líneas con (…) limpio si desborda, nunca a media letra.
+   - Sabor como nota al margen, 2 líneas. Efectos 2 líneas.
+   - Mano señala scroll con fade dorado + snap.
+   - No toca game.js. No mete marginalia. No toca móvil ni PC.
+   - Reversible: borra este bloque.
+   ========================================================================== */
+
+@media (pointer: coarse) and (orientation: portrait) and (min-width: 600px) {
+
+  .hand .page-card {
+    width: clamp(9rem, 26vw, 12rem);
+    min-height: clamp(10rem, 24vh, 12rem);
+    padding: clamp(0.5rem, 1.1vw, 0.7rem);
+    gap: clamp(0.22rem, 0.72vw, 0.34rem);
+    scroll-snap-align: center;
+  }
+
+  .hand .page-header {
+    min-height: 1.85rem;
+    gap: clamp(0.28rem, 0.8vw, 0.4rem);
+  }
+
+  .hand .page-cost {
+    width: clamp(1.35rem, 3.2vw, 1.65rem);
+    font-size: clamp(0.72rem, 1.5vw, 0.9rem);
+  }
+
+  .hand .page-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    max-height: none;
+    overflow: hidden;
+    overflow-wrap: break-word;
+    font-size: clamp(0.72rem, 1.3vw, 0.86rem);
+    line-height: 1.08;
+  }
+
+  .hand .page-type {
+    font-size: clamp(0.54rem, 1.1vw, 0.66rem);
+  }
+
+  .hand .effect-line {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    font-size: clamp(0.58rem, 1.1vw, 0.7rem);
+    line-height: 1.14;
+    overflow: hidden;
+    overflow-wrap: break-word;
+  }
+
+  .hand .page-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-style: italic;
+    font-size: clamp(0.6rem, 1.05vw, 0.72rem);
+    line-height: 1.18;
+    color: var(--parchment-dim);
+    border-top: 1px dashed rgba(251, 191, 36, 0.16);
+    padding-top: 0.28rem;
+    padding-bottom: 1.7rem;
+    margin-top: 0.05rem;
+    overflow: hidden;
+    overflow-wrap: break-word;
+  }
+
+  .hand {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 0.75rem;
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 0.75rem,
+      #000 calc(100% - 0.75rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 0.75rem,
+      #000 calc(100% - 0.75rem),
+      transparent 100%
+    );
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+  }
+}
+
+/* ==========================================================================
+   G2.1 CAPA 1 — INTRO PREVIA (negro puro, el ente como única luz) + hub sin anillos.
+   Solo elementos NUEVO (#ritual-intro y descendientes): no pisa tu CSS actual.
+   Reglas: sin parpadeo/anatomía (es luz/energía), sin tinta (la tinta es del
+   libro). La animación la hace GSAP en game.js; aquí solo forma y color base.
+   Relleno interno incluido (radial-gradient + text-shadow multicapa) para que
+   el glifo NO se vea hueco/negro por dentro.
+   Reversible: borra este bloque.
+   ========================================================================== */
+
+#ritual-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.5rem, 5vh, 3rem);
+  background: #020617;
+  padding: 2rem;
+  text-align: center;
+}
+#ritual-intro[hidden] { display: none; }
+
+.ritual-glyph-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  line-height: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.ritual-glyph-btn:focus-visible {
+  outline: 2px solid rgba(192, 132, 252, 0.6);
+  outline-offset: 8px;
+  border-radius: 50%;
+}
+
+.ritual-core {
+  display: grid;
+  place-items: center;
+  width: clamp(7rem, 26vw, 11rem);
+  height: clamp(7rem, 26vw, 11rem);
+  border-radius: 50%;
+  /* Pozo de luz DETRÁS del glifo: quita el "hueco" del centro. */
+  background: radial-gradient(circle at 50% 50%,
+    rgba(192, 132, 252, 0.22) 0%,
+    rgba(168, 85, 247, 0.10) 38%,
+    transparent 70%);
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.35);
+}
+
+.ritual-star {
+  font-size: clamp(3rem, 12vw, 5rem);
+  color: var(--purple-light, #c084fc);
+  /* Capa 0 0 2px casi blanca = el glifo brilla desde dentro, no solo halo fuera. */
+  text-shadow:
+    0 0 2px rgba(245, 240, 255, 0.85),
+    0 0 10px rgba(192, 132, 252, 0.75),
+    0 0 22px rgba(168, 85, 247, 0.55);
+  user-select: none;
+}
+
+.ritual-hint {
+  margin: 0;
+  color: var(--parchment-dim, #b8a98f);
+  font-size: clamp(0.7rem, 2.6vw, 0.92rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.orb-ring { display: none; }
+
+html.app-oled #ritual-intro { background: #000; }
+
+/* ==========================================================================
+   G2.1 CAPA 1b (v16) — CONTRASTE BRUTAL: HAZ VIOLETA + MEMBRANA CIAN.
+   Causa del "no noto nada" en v14/v15: el frio se logro apagando (indigo casi
+   negro) y el fondo noche se lo comio. Fix: color LUMINOSO de alto contraste.
+   - ::before (corona exterior): toroide violeta con UN haz casi blanco barriendolo
+     (mascara conica valle 0.08 / pico 1.0 -> salto de brillo obvio, sin aspas ni
+     rectangulo). = observa.
+   - ::after (membrana interior): toroide CIAN frio (no azul-morado, separacion
+     cromatica clara), SIN giro, late pesado con @keyframes. = poder/contiene.
+   Geometria/agujero/inset/z-index del layer INTACTOS (lo que ya valida que
+   "rodea", no "emana"). Bola, glifo y game.js SIN TOCAR.
+   Reversible: borra este bloque.
+   ========================================================================== */
+
+.orb-halo-layer {
+  position: absolute;
+  inset: -55%;          /* INTACTO (rodea) */
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;          /* INTACTO (detras del glifo, delante del fondo de la bola) */
+  opacity: 0;           /* INTACTO (game.js lo trae a 1 con fade) */
+  will-change: opacity;
+}
+
+.orb-halo-layer::before,
+.orb-halo-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Corona exterior: toroide violeta con UN haz casi blanco barriendolo. */
+.orb-halo-layer::before {
+  background: radial-gradient(circle at 50% 50%,
+    rgba(99, 102, 241, 0) 0%,
+    rgba(99, 102, 241, 0) 74%,
+    rgba(224, 231, 255, 0.95) 84%,   /* pico CASI BLANCO (luz pura fria) */
+    rgba(99, 102, 241, 0.40) 92%,    /* cuerpo indigo-medio */
+    rgba(67, 56, 202, 0) 100%);
+  -webkit-mask: conic-gradient(from 0deg,
+    rgba(0,0,0,0.08) 0deg,            /* VALLE CASI NULO */
+    rgba(0,0,0,0.08) 40deg,
+    rgba(0,0,0,1.0)  70deg,           /* PICO TOTAL */
+    rgba(0,0,0,1.0)  100deg,
+    rgba(0,0,0,0.08) 130deg,
+    rgba(0,0,0,0.08) 360deg);
+          mask: conic-gradient(from 0deg,
+    rgba(0,0,0,0.08) 0deg,
+    rgba(0,0,0,0.08) 40deg,
+    rgba(0,0,0,1.0)  70deg,
+    rgba(0,0,0,1.0)  100deg,
+    rgba(0,0,0,0.08) 130deg,
+    rgba(0,0,0,0.08) 360deg);
+  filter: blur(4px);                  /* mas definido = el haz corta mejor */
+  transform: rotate(var(--r1, 0deg)); /* game.js anima esto (sin tocar) */
+  opacity: var(--o1, 0.9);
+}
+
+/* Membrana interior: CIAN frio, late pesado, SIN giro. */
+.orb-halo-layer::after {
+  background: radial-gradient(circle at 50% 50%,
+    rgba(6, 182, 212, 0) 0%,         /* cyan-600 base */
+    rgba(6, 182, 212, 0) 71%,
+    rgba(165, 243, 252, 0.85) 77%,   /* filo interior CIAN CLARO */
+    rgba(34, 211, 238, 0.50) 81%,    /* cyan-400 medio */
+    rgba(6, 182, 212, 0.25) 85%,
+    rgba(8, 145, 178, 0) 89%);       /* cyan-700 fade */
+  filter: blur(3px);
+  opacity: 0.65;                      /* BASE MAS ALTA para que exista siempre */
+  transform: scale(1);                /* sin rotate */
+  animation: pressurePulse 5.5s ease-in-out infinite;
+}
+
+@keyframes pressurePulse {
+  0%, 100% { opacity: 0.65; transform: scale(1.000); }
+  50%      { opacity: 0.95; transform: scale(1.018); }
+}
+
+/* OLED: contiene brillo/desenfoque sin romper forma. */
+html.app-oled .orb-halo-layer::before { filter: blur(3px) brightness(0.90); }
+html.app-oled .orb-halo-layer::after  { filter: blur(2px) brightness(0.90); }
+
+.orb-ring { display: none; }
