@@ -1,471 +1,184 @@
-# Grimoire: Lost Pages — Design Tokens
-
-Este documento define la identidad visual del juego.  
-Su objetivo es que cualquier persona que abra el repositorio sepa cómo debe verse el juego final, sin depender de recuerdos ni de conversaciones externas.
-
----
-
-## 1. Concepto visual
-
-Grimoire: Lost Pages es un deckbuilder oscuro, arcano y ritualista.
-
-La interfaz debe sentirse como un grimorio viviente:
-
-- fondo profundo, casi negro azulado;
-- acentos violetas y azules de tinta arcana;
-- detalles dorados como runas o inscripciones;
-- símbolos de estrella/destello como motivo de marca;
-- jerarquía clara, legible en móvil vertical y cómoda en PC horizontal.
-
-El juego no debe parecer una app genérica. Debe parecer un ritual interactivo.
-
----
-
-## 2. Paleta oficial
-
-### Fondos
-
-| Token | Valor | Uso |
-|---|---|---|
-| --bg-deep | #05070f | Fondo más profundo, base del mundo |
-| --bg-night | #0f172a | Fondo principal de pantalla |
-| --bg-panel | rgba(15, 23, 42, 0.86) | Paneles HUD |
-| --bg-panel-strong | rgba(2, 6, 23, 0.94) | Paneles oscuros intensos |
-
-### Papel / pergamino arcana
-
-| Token | Valor | Uso |
-|---|---|---|
-| --parchment | #e8dcc4 | Texto cálido, etiquetas de página |
-| --parchment-dim | rgba(232, 220, 196, 0.72) | Texto secundario cálido |
-
-### Dorado ritual
-
-| Token | Valor | Uso |
-|---|---|---|
-| --gold | #fbbf24 | Bordes, costes, acentos de marca |
-| --gold-soft | rgba(251, 191, 36, 0.82) | Etiquetas y títulos suaves |
-| --gold-border | rgba(251, 191, 36, 0.34) | Bordes de panel |
-
-### Tinta arcana
-
-| Token | Valor | Uso |
-|---|---|---|
-| --ink | #60a5fa | Tinta Arcana, energía, brillos fríos |
-| --ink-glow | rgba(96, 165, 250, 0.35) | Glow de tinta |
-
-### Violeta de grimorio
-
-| Token | Valor | Uso |
-|---|---|---|
-| --purple | #a855f7 | Poder, avatar enemigo, motivo estelar |
-| --purple-light | #c084fc | Puntas brillantes del destello |
-| --purple-deep | #4c1d95 | Fondos profundos de cartas de poder |
-| --purple-glow | rgba(168, 85, 247, 0.28) | Glow arcano |
-
-### Combate
-
-| Token | Valor | Uso |
-|---|---|---|
-| --blood | #ef4444 | Vida, daño, ataque |
-| --blood-deep | #7f1d1d | Fondo de cartas de ataque |
-| --blood-glow | rgba(239, 68, 68, 0.25) | Glow de daño |
-| --heal | #22c55e | Curación |
-| --heal-deep | #14532d | Fondo de curación |
-| --heal-glow | rgba(34, 197, 94, 0.22) | Glow de curación |
-| --shield | #38bdf8 | Bloqueo |
-| --shield-deep | #1e3a8a | Fondo frío de defensa |
-| --corrupt | #65a30d | Corrupción / maldición orgánica |
-| --corrupt-deep | #1a2e05 | Fondo de corrupción |
-
-### Texto
-
-| Token | Valor | Uso |
-|---|---|---|
-| --text | #f8fafc | Texto principal |
-| --text-dim | rgba(248, 250, 252, 0.78) | Texto secundario |
-| --text-faint | rgba(248, 250, 252, 0.52) | Texto terciario |
-
----
-
-## 3. Degradado de marca del logotipo
-
-El wordmark del icono usa un degradado vertical que va del dorado cálido al violeta arcano.
-
-Referencia visual aproximada:
-
-background: linear-gradient(180deg, #fbbf24 0%, #a855f7 100%);
-
-Variantes útiles:
-
-/* Dorado a violeta claro, más brillante */
-background: linear-gradient(180deg, #fbbf24 0%, #c084fc 100%);
-
-/* Violeta profundo a tinta, para fondos oscuros */
-background: linear-gradient(135deg, #4c1d95 0%, #60a5fa 100%);
-
-Este degradado se reserva principalmente para:
-
-- logotipo;
-- títulos de pantalla de inicio;
-- elementos de marca muy destacados.
-
-No debe usarse en todo el texto del juego, para no perder jerarquía.
-
----
-
-## 4. Tipografía
-
-### Fuente de marca
-
-La fuente de marca es:
-
-OPTIColumna Solid
-
-Archivo web:
-
-fonts/opticolumna-solid.woff2
-
-Declaración CSS:
-
-@font-face {
-  font-family: "OPTIColumna Solid";
-  src: url("./fonts/opticolumna-solid.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-Variable:
-
---font-title: "OPTIColumna Solid", Georgia, "Times New Roman", serif;
-
-### Uso de la fuente de marca
-
-Se usa en:
-
-- título de la intro (#intro-title);
-- nombres de cartas/páginas (.page-name, .deck-item-name);
-- etiquetas de panel tipo “Vitalidad”, “Tinta Arcana” (.panel-label);
-- nombres de enemigo (.enemy-name);
-- títulos de overlays (.overlay-card h1/h2);
-- textos ceremoniales cortos (.battle-message).
-
-### Peso único
-
-La familia disponible es solo Solid.
-
-Por tanto:
-
-- no usar font-weight: bold en elementos con --font-title;
-- no usar font-style: italic en elementos con --font-title;
-- si se necesita énfasis, usar color, tamaño, letter-spacing o glow, no bold/italic sintéticos.
-
-Regla práctica:
-
-font-weight: 400;
-font-style: normal;
-
-### Fuente de interfaz
-
-Para cuerpo de texto, descripciones y UI general:
-
---font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-
-### Fuente numérica / fuerte
-
-Para costes, valores numéricos y botones principales:
-
---font-strong: "Arial Black", "Segoe UI", Impact, sans-serif;
-
----
-
-## 5. Motivo de marca: la estrella arcana
-
-El símbolo principal del icono es una estrella/destello de cuatro puntas con curvas cóncavas, en violeta luminoso.
-
-Este motivo debe considerarse el símbolo recurrente del juego.
-
-Puede aparecer como:
-
-- avatar enemigo (#enemy-avatar, actualmente usa el carácter ✦);
-- glow en cartas de poder (.is-power);
-- separadores rituales;
-- indicador de selección;
-- pantalla de carga;
-- partículas flotantes;
-- borde interior de paneles importantes.
-
-Descripción visual:
-
-- forma de spark / destello de 4 puntas;
-- centro violeta brillante (--purple);
-- halo suave morado/azul (--purple-glow, --ink-glow);
-- sensación de magia concentrada;
-- siempre sobre fondo oscuro.
-
-No sustituir este motivo por iconos genéricos de videojuego. Es parte de la identidad.
-
----
-
-## 6. Fondos y atmósfera
-
-El fondo general debe mantener profundidad arcana:
-
-background:
-  radial-gradient(circle at 18% 18%, rgba(88, 28, 135, 0.18), transparent 28%),
-  radial-gradient(circle at 82% 24%, rgba(30, 64, 175, 0.16), transparent 30%),
-  radial-gradient(circle at 50% 82%, rgba(120, 53, 15, 0.10), transparent 35%),
-  linear-gradient(180deg, #05070f, #0f172a);
-
-El campo de ritual (.battlefield) puede incluir:
-
-- círculo rúnico giratorio muy lento (.battlefield::before, animación slowSpin);
-- viñeta oscura (.battlefield::after);
-- glow violeta central;
-- partículas o textos flotantes.
-
-La atmósfera debe ser discreta. El juego es legible primero, atmosférico después.
-
----
-
-## 7. Cartas / Páginas
-
-Las cartas se llaman internamente “páginas”, pero visualmente deben leerse como cartas jugables.
-
-Estructura mínima de una página (.page-card):
-
-1. coste (.page-cost);
-2. nombre (.page-name);
-3. tipo (.page-type);
-4. descripción (.page-desc).
-
-Colores por tipo:
-
-| Tipo | Clase CSS | Color dominante |
-|---|---|---|
-| Ataque | .is-attack / [data-type="attack"] | rojo sangre (--blood) |
-| Defensa / Skill | .is-skill / [data-type="skill"] | azul escudo (--shield) |
-| Curación | .is-heal | verde vida (--heal) |
-| Poder | .is-power / [data-type="power"] | violeta arcano (--purple) |
-| Maldición / Corrupción | .is-curse / .is-corrupted | verde podrido / oliva (--corrupt) |
-
-El coste debe ser siempre circular y dorado o acorde al tipo.
-
-El nombre de la carta usa --font-title.
-
-La descripción usa --font-ui.
-
-Estado seleccionado: elevación suave + borde dorado intenso + glow.
-
-Estado deshabilitado: opacidad reducida + saturación baja.
-
----
-
-## 8. HUD
-
-El HUD superior (.hud) se divide en tres bloques:
-
-- jugador: vitalidad y efectos (#player-panel);
-- recurso central: Tinta Arcana (#ink-panel);
-- enemigo: nombre, vida e intención (#enemy-panel).
-
-Los paneles usan:
-
-- fondo oscuro translúcido (--bg-panel);
-- borde dorado tenue (--gold-border);
-- sombra profunda (--shadow-panel);
-- glow arcano suave.
-
-En móvil vertical, el layout cambia a grid de 2 columnas para optimizar espacio.
-
----
-
-## 9. Botones
-
-El botón principal es ritual, no genérico.
-
-Características (.ritual-button):
-
-- fondo oscuro con brillo dorado superior;
-- borde dorado (rgba(251, 191, 36, 0.55));
-- texto en mayúsculas;
-- tipografía fuerte (--font-strong);
-- sombra profunda (--shadow-button);
-- feedback táctil claro (transform en hover/active).
-
-Texto recomendado para fin de turno:
-
-Cerrar Ritual
-
-No usar “End Turn” en la interfaz principal, salvo que se traduzca o se integre narrativamente.
-
-Botón secundario (.secondary-button): mismo estilo pero tono pergamino (--parchment) y sin glow dorado intenso.
-
----
-
-## 10. Overlays
-
-Los overlays deben sentirse como páginas o visiones separadas del ritual.
-
-Incluyen:
-
-- intro narrativa (#intro-screen);
-- resultado de victoria/derrota (#result-screen);
-- inspección de página (#inspect-overlay);
-- lista de Grimorio/Cenizas (#deck-overlay).
-
-Reglas:
-
-- fondo oscuro semitransparente (rgba(2, 6, 23, 0.82));
-- tarjeta central con borde dorado (--gold-border);
-- título en fuente de marca (--font-title);
-- texto legible (--text-dim);
-- cierre claro con botón o tecla Escape.
-
-El modal de intro está centrado ópticamente usando flexbox en .intro-card.
-
----
-
-## 11. Movimiento
-
-El movimiento debe ser lento, orgánico y arcano.
-
-Animaciones permitidas:
-
-- respiración del avatar enemigo (avatarPulse, 3.4s);
-- giro lento del círculo rúnico (slowSpin, 38s);
-- elevación suave de cartas (transition 140ms);
-- textos flotantes de daño/curación/bloqueo (floatUp, 900ms);
-- glow pulsante en elementos seleccionados.
-
-Evitar:
-
-- rebotes excesivos;
-- animaciones rápidas de casino;
-- parpadeos fuertes;
-- movimientos que distraigan de la lectura de cartas.
-
-Respetar siempre:
-
-@media (prefers-reduced-motion: reduce) {
-  /* Desactivar animaciones largas y transiciones bruscas */
-}
-
----
-
-## 12. Orientación
-
-El juego está pensado principalmente para móvil vertical.
-
-En PC puede disfrutarse horizontal, pero la composición base debe funcionar en vertical.
-
-No debe aparecer un aviso bloqueante de “gira el dispositivo” en la versión final, salvo que en algún momento se decida oficialmente que el juego es solo horizontal. Actualmente, el HTML limpio no incluye ese bloque.
-
----
-
-## 13. Iconografía PWA
-
-Archivos actuales:
-
-icons/favicon.ico
-icons/icon-192.png
-icons/icon-512.png
-icons/icon-maskable-512.png
-
-El icono maskable debe conservar el diseño del logotipo, pero escalado para que estrella y texto entren dentro del área segura del recorte.
-
-Regla:
-
-- el icono normal puede mostrar el logo completo con texto;
-- el maskable debe evitar cortes y fondo blanco;
-- el maskable usa fondo opaco del tema oscuro (#0f172a o similar).
-
----
-
-## 14. Principio rector
-
-Si hay duda visual, preguntar:
-
-> ¿Esto parece parte de un grimorio vivo, oscuro y arcano?
-
-Si la respuesta es no, se ajusta.
-
-El juego no debe parecer una plantilla de deckbuilder genérica.  
-Debe parecer un libro maldito que el jugador está intentando reescribir.
-
----
-
-## 15. Scrollbars coherentes
-
-Las barras de scroll internas (listados de Grimorio/Cenizas, overlays largos) NO deben usar el estilo nativo gris del navegador. Deben integrarse gráficamente con el resto del juego.
-
-Estilo obligatorio:
-
-- Track: oscuro semitransparente (rgba(2, 6, 23, 0.4)), redondeado.
-- Thumb: degradado vertical dorado → violeta (linear-gradient(180deg, var(--gold-soft), rgba(168, 85, 247, 0.6))), redondeado, con shadow interna sutil.
-- Hover thumb: intensificar colores (var(--gold) → var(--purple-light)).
-- Ancho: fino (~0.5rem / 8px). No grueso ni invasivo.
-- Firefox fallback: scrollbar-width: thin; scrollbar-color: var(--gold-soft) rgba(2, 6, 23, 0.4);.
-
-Regla extra para móvil vertical: reservar margen derecho (padding-right: 0.75rem) en los contenedores scrolleables (ej. .deck-list) para que la barra nunca tape el texto de los nombres de carta.
-
----
-
-## 16. Estilo Visual Definitivo (Ruta 1)
-
-Dirección estética confirmada: **línea clara + sombreado plano** (flat shading con outlines negros gruesos). Referencias visuales: *Hades*, *Slay the Spire*, *Inscryption* (cartas).
-
-Características obligatorias de todas las ilustraciones (cartas, enemigos, mapa, tienda, UI):
-
-- **Líneas negras gruesas** definiendo siluetas y detalles internos. Contraste alto contra fondos oscuros. Legibilidad garantizada incluso a tamaño pequeño (carta de mano).
-- **Rellenos planos saturados**, sin gradientes suaves ni texturas fotorealistas. Los colores provienen exclusivamente de la paleta oficial (sección 2). La ilustración aporta forma y contraste, no introduce nuevos tonos fuera de tokens existentes.
-- **Sombras duras laterales** (cel-shading básico): una sola dirección de luz implícita, sombra sólida de un tono inferior, sin penumbra difusa. Da volumen sin complicar producción.
-- **Sin ruido visual**: nada de grano de película, manchas de tinta aleatorias ni bordes irregulares tipo acuarela. Eso rompería la consistencia entre piezas producidas por diferentes manos (humana o IA).
-- **Coherencia temática**: todos los elementos comparten lenguaje gráfico. Si una carta tiene espadas estilizadas con filo recto, los iconos de ataque del HUD y las armas de los enemigos siguen esa misma geometría. Mezclar estilos (ej: pixel art en enemigos + vector en cartas) queda prohibido.
-
-Nota técnica: este estilo facilita la producción digital (vector o raster con capas planas) y escala bien a APK nativo sin pérdida de nitidez en pantallas HD. Permite generar assets vía IA generativa (Midjourney/Stable Diffusion) con prompts específicos de "flat shading dark fantasy lineart" y post-proceso manual mínimo para homogeneizar trazos.
-
----
-
-## 17. Alcance Final (APK Nativo, Pool Ampliado, Arte Completo)
-
-El proyecto deja de ser prototipo/PWA ligera y evoluciona hacia **juego funcional distribuido como APK**, pensado inicialmente para uso personal pero con arquitectura preparada para futura comercialización.
-
-Implicaciones directas:
-
-- **Peso libre**: no hay restricción severa de tamaño. Se permiten PNG/JPG de alta resolución (≥512×768 px por carta), sin compresión agresiva ni spritesheets ultra-optimizadas. Prioridad: calidad visual > bytes ahorrados.
-- **Pool de cartas objetivo**: **40–60 únicas**. Subido desde el rango inicial de 30-45 porque ahora hay margen real de almacenamiento y desarrollo. Esto permite cubrir todos los tipos básicos (ataque, defensa, poder, curación, maldición/corrupto) con variantes suficientes para builds reconocibles (aggro, control, sustain, burst…).
-- **Arte completo**: ~50 cartas ilustradas + retratos/avatar de enemigos + iconografía de nodos del mapa procedural + UI de tienda/eventos + efectos visuales clave. Todo bajo Ruta 1 (sección 16). Producción gradual: empezar por pilares (~12–15 cartas fundamentales + primer boss), integrar, probar, expandir por sets temáticos.
-- **Motor visual previsto**: GSAP + Canvas híbrido sobre DOM actual (fase G del roadmap). Mantiene inversión existente (HTML/CSS/JS) y añade capas de animación/partículas/transiciones cinematográficas sin refactorizar a Phaser/PixiJS desde cero. Opción abierta: migrar a motor gráfico puro si mañana se quisiera producción más ambiciosa (multijugador, shaders avanzados), pero hoy no es requisito.
-- **Distribución**: empaquetado mediante Capacitor/Cordova para Android (APK). iOS posible pero secundario. Web/PWA sigue siendo canal de prueba rápido, pero el target final es instalación local nativa.
-- **Comercialización**: no prioritaria ahora, pero scope diseñado para que mañana sea publicable sin rehacer cimientos técnicos ni estéticos.
-
-Principio operativo: cada decisión técnica o artística debe responder a *"¿esto acerca el juego a un producto terminable y vendible?"*. Si la respuesta es no, se reconsidera antes de implementar.
-
-## 18. Principios de Producción Profesional
-
-El proyecto se construye, desde el primer día, con calidad de producto comercializable, aunque su destino inmediato sea personal. El objetivo es que, si algún día se decide vender, no haya que reescribir cimientos: solo añadir lo que exclusivamente importa cuando hay comercio.
-
-Regla rectora: construir como si fuera a venderse mañana, pero sin gastar esfuerzo en lo que solo importa cuando se vende.
-
-### Lo que se hace a nivel profesional YA (barato, evita reescribir)
-
-- Textos jugables en datos, nunca en funciones. Nombres de cartas, descripciones, nombres de enemigos y mensajes viven en estructuras de datos (CARDS, ENEMIES, bloques de texto), no hardcodeados dentro de la lógica. Razón: el día que se quiera otro idioma, los strings se extraen a archivos de localización sin tocar el motor. No se implementa i18n ahora, pero se deja la puerta abierta manteniendo los textos en datos.
-- Cero números mágicos sueltos. Vida inicial, daño base, costes, umbrales de corrupción y probabilidades viven como constantes con nombre o en un bloque de balance al principio del archivo. Razón: ajustar dificultad o responder a feedback de prueba es cambiar una constante, no cazar un valor perdido entre cientos de líneas.
-- Assets fuera del código, con rutas estables. Las ilustraciones viven en carpetas por tipo (assets/cards/, assets/enemies/, etc.) y se referencian por id estable, nunca embebidas ni con rutas que cambien. Razón: permite DLC, skins o sustitución de arte sin tocar lógica.
-- Control de versiones con commits atómicos y mensajes claros. Una funcionalidad por commit, mensaje descriptivo, nada de actualizaciones genéricas. Razón: historial legible para revertir, auditar o mostrar a un editor.
-- Licencias y derechos verificados antes de usar. Cualquier fuente, asset o herramienta de IA generativa usada debe permitir uso comercial según su licencia. Se comprueba antes de integrar, no el día de publicar. Razón: evita retiradas legales cuando haya dinero de por medio.
-- Accesibilidad tratada como requisito, no como adorno. Respeto a movimiento reducido, foco visible, alternativas no cromáticas a la información (glifo más texto, no solo color) y modo de alto contraste. Razón: amplía audiencia y es valorado en plataformas de distribución.
-
-### Lo que NO se hace ahora (se deja al momento comercial, es caro)
-
-- Multiplataforma más allá de Android/iOS vía Capacitor. Steam, consolas u otras tiendas se evalúan solo cuando exista oferta real.
-- Backend, cuentas en la nube, guardado remoto, rankings o logros de plataforma. La memoria es local mientras no haya motivo de negocio.
-- DRM, anti-piratería o autenticación. Juego offline; las plataformas ya aportan su capa el día de vender.
-- Analíticas o telemetría. Ruido y riesgo de privacidad en un juego personal; solo con consentimiento explícito si algún día se comercializa.
-- Pipeline automatizado de builds. Innecesario para desarrollo individual; se monta si hay equipo.
-
-### Principio operativo
-
-Cada decisión técnica debe pasar dos filtros. Primero: esto acerca el juego a un producto terminable y vendible. Segundo: esto cuesta ahora o costará reescribir después. Si una práctica es barata hoy y evita reescribir mañana, se adopta ya. Si es cara hoy y solo importa cuando haya comercio, se pospone. El equilibrio entre ambos filtros es lo que mantiene el proyecto profesional sin paralizarlo.
+# REGISTRO DE FEATURES — NUESTRO VIAJE
+
+Fuente de verdad de las funcionalidades pedidas por el propietario.
+Cada feature lleva ID, descripción, criterios de aceptación y fase.
+Nada se implementa sin estar registrado aquí primero.
+
+==================================================================
+## DECISIONES CERRADAS (constancia, no renegociables sin orden expresa)
+- Nombre de la app: "Nuestro Viaje" (se queda; atemporal e íntimo).
+  Etiqueta del launcher: short_name con salto de línea; si la ROM lo muestra
+  junto, se acepta (plan B disponible: short_name "Viaje").
+- Transcripción de audios: Camino B (STT externo con consentimiento explícito
+  al pulsar "Transcribir"), como WhatsApp.
+- Minijuego: 1 contra 1 por turnos.
+- Accesibilidad: set completo (tamaño de texto, alto contraste, filtro
+  cálido/bajo brillo, grosor de líneas) vía variables CSS, sin romper diseño.
+- Fullscreen en Vivo/OriginOS: se ACEPTA la franja al arranque (se retira
+  bajando el panel una vez); SIN nudge de requestFullscreen y SIN cartel.
+  En Android estándar el manifest (display: fullscreen) da pantalla completa
+  limpia desde el arranque.
+- Splash de entrada (avión cruzando la ruta + nombre): se conserva como
+  ritual de marca, una vez por sesión.
+- Reparto de roles de la pantalla Ruta: MAPA = lo visual y vivo;
+  LÍNEA DE TIEMPO = el relato; DETALLES = el cuadro de mando numérico.
+- Sistema de diseño: identidad PROPIA (azul noche + atardecer + melocotón +
+  dorado, tipografía dual manuscrita+sans, tokens.css). NO es Material Design;
+  solo se toma prestada la estética Material You para los widgets de clima.
+
+==================================================================
+## F-CHAT-01 · Mantener pulsado un mensaje → menú contextual
+- Hoja inferior elegante al mantener pulsada una burbuja (~500 ms), con
+  vibración suave si el dispositivo la soporta.
+- Acciones v1: Copiar texto (solo mensajes de texto), Responder, Reaccionar
+  con PICKER COMPLETO (todos los emojis Unicode, categorías + buscador),
+  Eliminar.
+- Catálogo de emojis en src/lib/emoji-data.js (Unicode, dominio público),
+  cacheado offline; el glifo lo dibuja la fuente del sistema de cada móvil.
+- Una reacción por persona por mensaje; pulsar la propia la quita/cambia.
+- La reacción se muestra como píldora pequeña bajo la burbuja.
+- Fase: esquema `reactions` en FASE 2; UI + picker en FASE 3.
+
+## F-CHAT-02 · Deslizar para responder
+- Arrastre horizontal (hacia la derecha) sobre una burbuja muestra affordance
+  de respuesta (flecha + previsualización); al soltar, el composer entra en
+  modo respuesta con cita encadenada (reply_to), cancelable.
+- El mensaje enviado renderiza la cita como snippet sobre la burbuja.
+- Alternativa accesible: acción "Responder" en el menú de F-CHAT-01.
+- Fase: FASE 3.
+
+## F-CHAT-03 · Doble hora España ↔ Izcalli en el chat (no agresiva)
+- Línea fina y atenuada bajo la cabecera del chat:
+  `Sevilla 22:45 · Izcalli 15:45` (tipografía pequeña, color text-dim).
+- Sin segundos: se actualiza al cambiar el minuto.
+- Horarios reales vía Intl.DateTimeFormat con timeZone
+  (Europe/Madrid, America/Mexico_City).
+- Zonas horarias en config.js (cityA.tz / cityB.tz) → Norma 2.
+- Fase: FASE 3.
+
+## F-CHAT-04 · Indicador "escribiendo…"
+- Cuando la otra persona teclea, indicador discreto ("escribiendo…") en el
+  chat, sin contenido del mensaje.
+- Canal de presencia/estado efímero de Supabase Realtime (no se persiste).
+- Fase: FASE 3.
+
+## F-CHAT-05 · Indicador "grabando audio" de la otra persona
+- Cuando la otra persona mantiene pulsado el micro, en mi pantalla aparece
+  abajo el icono de micro ("grabando audio…"), estilo WhatsApp.
+- Reutiliza el canal de presencia de F-CHAT-04 con tipo `audio`.
+- Fase: FASE 5.
+
+## F-CHAT-06 · Checks estilo WhatsApp
+- 1 check = enviado al servidor; 2 checks = entregado a su dispositivo;
+  2 checks AZULES = leído.
+- Basado en delivered_at / read_at que actualiza el receptor vía RPC.
+- Fase: FASE 3.
+
+## F-ACC-01 · Accesibilidad para queratocono
+- Panel "Accesibilidad" (en Más + acceso rápido discreto en el chat) con:
+    · Tamaño de texto escalable.
+    · Alto contraste.
+    · Filtro cálido / bajo brillo (fotofobia).
+    · Grosor de líneas e iconos reforzado.
+- Preferencia persistida POR DISPOSITIVO (localStorage), no sincronizada
+  entre móviles (es una preferencia de cada ojo).
+- Implementado con variables CSS y atributos en <html>; el sistema de tokens
+  de FASE 1 ya nace preparado para escalar; identidad visual intacta.
+- Fase: micro-entrega de accesibilidad al cerrar FASE 1.
+
+## F-GAME-01 · Minijuego trivial Sevilla ↔ Izcalli (1v1 por turnos)
+- Sección de preguntas tipo "Preguntados" con temática Sevilla / Izcalli.
+- Banco de preguntas editable (set inicial generado + ampliación del dueño).
+- Puntuaciones y turnos en Supabase; sin servicio externo.
+- Modo CERRADO: 1 contra 1 por turnos.
+- Fase: FASE 11 (extras y pulido).
+
+## F-AUD-01 · Transcripción de audios (Camino B)
+- Al pulsar "Transcribir", ese audio concreto se descifra en el dispositivo y
+  se envía a un STT gratuito (Groq/Whisper, capa gratuita, procesamiento
+  efímero, sin retención). El resto del audio sigue cifrado E2E.
+- Consentimiento explícito por uso; nunca automático.
+- Fase: FASE 5.
+
+## F-WX-01 · Clima de cada ciudad (Open-Meteo, sin API key)
+- Proveedor Open-Meteo: gratis, SIN API key, ~10k llamadas/día; cache corto.
+- Reutiliza lat/lng de config.js.
+- Puntos de consumo:
+    · Widgets de clima de la pestaña Mapa (F-MAP-01).
+    · Ficha técnica de la pestaña Detalles (F-MAP-01).
+    · Chat, junto a la doble hora de F-CHAT-03 (discreto).
+- Fase: FASE 3 (chat) y FASE 8 (Mapa + Detalles).
+
+## F-MAP-01 · Enriquecer pestaña Mapa + widgets de clima apilados; Detalles = cuadro numérico
+- PESTAÑA MAPA:
+    (1) Mejoras visuales del mapa: progreso real (estela sólida en lo
+        recorrido + punteado en lo pendiente), curva con degradado
+        melocotón→dorado + glow, estela que se desvanece detrás del avión,
+        leyenda sutil despegue → crucero → aterrizaje.
+    (2) DEBAJO del mapa: DOS WIDGETS DE CLIMA APILADOS verticalmente (uno por
+        ciudad, a ancho completo), estilo widget Android (Material You):
+        fondo translúcido + blur, esquinas muy redondeadas. Cada widget lleva:
+        nombre de ciudad + bandera, HORA LOCAL viva (actualiza al minuto),
+        icono de clima grande, temperatura grande en melocotón, condición en
+        texto pequeño y mín/máx en miniatura.
+        (Apilados, no lado a lado: en móvil estrecho aprovechan el ancho y se
+        leen como widgets nativos de Android.)
+    Nota: el SVG del mapa es componente compartido con el Inicio, así que las
+    mejoras visuales del SVG benefician a ambos; los widgets viven SOLO en la
+    pestaña Mapa de Ruta.
+- PESTAÑA DETALLES (cuadro de mando numérico, como estaba previsto):
+    (1) Estado de la ruta: distancia total, recorrida, restante y % del viaje
+        (o "fecha por confirmar").
+    (2) Clima DETALLADO por ciudad (temp, condición, mín/máx) como ficha técnica.
+    (3) Hora local de cada ciudad.
+    (4) Coordenadas completas de cada ciudad.
+    (5) Año del encuentro.
+    Nota: hora y clima aparecen en Mapa (vistazo vivo en los widgets) y en
+    Detalles (ficha técnica) con profundidades distintas, por decisión del
+    propietario; si más adelante sobra en una, se recorta en una línea.
+- PESTAÑA LÍNEA DE TIEMPO: sin cambios (hitos + avión + frase).
+- Backlog (no v1): zoom/pellizco; vuelo real en vivo (APIs de pago).
+- Reusa F-WX-01 (Open-Meteo) y las tz de config.js (la hora viva de los
+  widgets usa esas mismas zonas horarias).
+- Fase: FASE 8 (con micro-entrega enriquecida adelantable).
+
+## F-TOOL-01 · Setup Wizard de clonado (SOLO propietario)
+- Ruta separada no enlazada desde la app: /tools/setup.html.
+- Acceso con passphrase del propietario (hash embebido; puerta entornada, no
+  bóveda: protege un formulario vacío, no datos reales; los datos de cada
+  pareja viven en su repo privado de GitHub y en Supabase con RLS).
+- Formulario con todos los campos de la plantilla (nombres, ciudades,
+  coordenadas, zonas horarias, fecha del viaje, textos, slots de iconos,
+  rutas de assets) + subida de los assets de esa pareja (2 iconos, foto de
+  fondo).
+- Previsualización en vivo de bienvenida + Inicio con esos datos, antes de
+  generar nada.
+- Export: config.js generado listo para el repo clonado (+ opcional ZIP con
+  config y assets renombrados). Todo client-side, 0 €.
+- Fase: FASE 12 · Plantilla y clonado.
+
+## F-SEC-01 · KILL SWITCH (recordatorio permanente)
+- Apagado de emergencia de toda la app, server-side: Edge Function + secreto
+  maestro guardado en la NOTA PRIVADA del propietario.
+- JAMÁS un botón, texto o pista en ninguna UI interna.
+- Al activarse: la app deja de servir contenido y las claves E2EE se
+  invalidan; los datos permanecen cifrados e ilegibles.
+- Fase: FASE 9 (esqueleto desde FASE 2, integración con claves en FASE 9).
+
+## F-INSTALL-01 · Onboarding de instalación multi-navegador
+- Objetivo: que instalar la PWA cueste 1 toque (Chromium) o 2 toques guiados
+  (iOS/Firefox), sin asumir que el navegador de ella es Chrome.
+- Chromium: capturar `beforeinstallprompt` y mostrar banner propio elegante
+  ("Instala Nuestro Viaje" + botón melocotón); al pulsar, prompt nativo.
+- iOS/Safari y Firefox: detectar plataforma y mostrar guía visual de 2 toques
+  (Compartir → Añadir a pantalla de inicio / Menú → Añadir), con iconos.
+- Si ya está instalada (display-mode: standalone), no mostrar nada.
+- No existe auto-instalación sin gesto (limitación de seguridad de todos los
+  navegadores); esto es lo más cercano permitido.
+- Fase: FASE 1 (es UI de onboarding, sin backend) o FASE 2 junto al arranque.
+
+==================================================================
+## BACKLOG (mejoras opcionales, NO comprometidas para v1)
+- Fijar mensajes destacados.
+- Mostrar "hora local de ella" al componer un mensaje.
+- Zoom/pellizco en el mapa; vuelo real en vivo (APIs de pago).
